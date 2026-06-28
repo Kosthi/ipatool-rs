@@ -14,7 +14,11 @@ use ipatool_core::model::Platform;
 use output::OutputFormat;
 
 #[derive(Parser)]
-#[command(name = "ipatool", version, about = "Download iOS IPA files from the App Store")]
+#[command(
+    name = "ipatool",
+    version,
+    about = "Download iOS IPA files from the App Store"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -120,9 +124,8 @@ async fn main() -> Result<()> {
     std::fs::create_dir_all(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
-    let mut client =
-        ipatool_core::client::AppleClient::new(guid_str, Some(&cookie_path))
-            .context("failed to create client")?;
+    let mut client = ipatool_core::client::AppleClient::new(guid_str, Some(&cookie_path))
+        .context("failed to create client")?;
 
     match cli.command {
         Commands::Auth { action } => match action {
@@ -150,16 +153,12 @@ async fn main() -> Result<()> {
             platform,
             country,
         } => {
-            commands::search::search(&client, &term, limit, platform, &country, cli.format)
-                .await?
+            commands::search::search(&client, &term, limit, platform, &country, cli.format).await?
         }
-        Commands::Purchase {
-            bundle_identifier,
-        } => {
+        Commands::Purchase { bundle_identifier } => {
             let account = load_account()?;
             client.set_account(account.clone());
-            commands::purchase::purchase(&client, &bundle_identifier, &account, cli.format)
-                .await?
+            commands::purchase::purchase(&client, &bundle_identifier, &account, cli.format).await?
         }
         Commands::Download {
             bundle_identifier,

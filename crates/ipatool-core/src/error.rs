@@ -61,13 +61,11 @@ impl StoreError {
     }
 
     pub fn from_plist_dict(dict: &HashMap<String, plist::Value>) -> Option<Self> {
-        let failure_type = dict
-            .get("failureType")
-            .and_then(|v| match v {
-                plist::Value::String(s) => Some(s.as_str()),
-                plist::Value::Integer(_) => None,
-                _ => None,
-            });
+        let failure_type = dict.get("failureType").and_then(|v| match v {
+            plist::Value::String(s) => Some(s.as_str()),
+            plist::Value::Integer(_) => None,
+            _ => None,
+        });
 
         let failure_type_str = match &failure_type {
             Some(s) => *s,
@@ -75,8 +73,7 @@ impl StoreError {
                 if let Some(plist::Value::Integer(i)) = dict.get("failureType") {
                     return Some(Self::from_failure(
                         &i.as_signed().map_or_else(String::new, |v| v.to_string()),
-                        dict.get("customerMessage")
-                            .and_then(|v| v.as_string()),
+                        dict.get("customerMessage").and_then(|v| v.as_string()),
                     ));
                 }
                 return None;

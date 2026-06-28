@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 
 use ipatool_core::api;
 use ipatool_core::client::AppleClient;
-use ipatool_core::model::{Account, Platform};
 use ipatool_core::model::storefront::country_code_from_store_front;
+use ipatool_core::model::{Account, Platform};
 
 use crate::output::{self, OutputFormat};
 
@@ -47,10 +47,9 @@ pub async fn meta(
 ) -> Result<()> {
     let resolved_app_id = resolve_app_id(client, app_id, bundle_identifier, account).await?;
 
-    let result =
-        api::versions::get_version_metadata(client, resolved_app_id, account, version_id)
-            .await
-            .context("failed to get version metadata")?;
+    let result = api::versions::get_version_metadata(client, resolved_app_id, account, version_id)
+        .await
+        .context("failed to get version metadata")?;
 
     match format {
         OutputFormat::Text => {
@@ -79,10 +78,10 @@ async fn resolve_app_id(
     match app_id {
         Some(id) => Ok(id),
         None => {
-            let bid = bundle_identifier
-                .ok_or_else(|| anyhow::anyhow!("either --app-id or --bundle-identifier is required"))?;
-            let country =
-                country_code_from_store_front(&account.store_front).unwrap_or("US");
+            let bid = bundle_identifier.ok_or_else(|| {
+                anyhow::anyhow!("either --app-id or --bundle-identifier is required")
+            })?;
+            let country = country_code_from_store_front(&account.store_front).unwrap_or("US");
             let app = api::lookup::lookup(client, bid, country, Platform::IPhone)
                 .await
                 .context("lookup failed")?

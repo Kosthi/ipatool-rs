@@ -27,10 +27,7 @@ async fn try_purchase(
     let url = buy_url(account);
 
     let mut body = plist::Dictionary::new();
-    body.insert(
-        "appExtVrsId".into(),
-        plist::Value::String("0".into()),
-    );
+    body.insert("appExtVrsId".into(), plist::Value::String("0".into()));
     body.insert(
         "hasAskedToFulfillPreorder".into(),
         plist::Value::String("true".into()),
@@ -47,10 +44,7 @@ async fn try_purchase(
         "guid".into(),
         plist::Value::String(client.guid().to_string()),
     );
-    body.insert(
-        "needDiv".into(),
-        plist::Value::String("0".into()),
-    );
+    body.insert("needDiv".into(), plist::Value::String("0".into()));
     body.insert(
         "origPage".into(),
         plist::Value::String(format!("Software-{app_id}")),
@@ -59,18 +53,12 @@ async fn try_purchase(
         "origPageLocation".into(),
         plist::Value::String("Buy".into()),
     );
-    body.insert(
-        "price".into(),
-        plist::Value::String("0".into()),
-    );
+    body.insert("price".into(), plist::Value::String("0".into()));
     body.insert(
         "pricingParameters".into(),
         plist::Value::String(pricing_parameters.into()),
     );
-    body.insert(
-        "productType".into(),
-        plist::Value::String("C".into()),
-    );
+    body.insert("productType".into(), plist::Value::String("C".into()));
     body.insert(
         "salableAdamId".into(),
         plist::Value::String(app_id.to_string()),

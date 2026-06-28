@@ -20,8 +20,7 @@ pub async fn login(
             if non_interactive {
                 bail!("password required in non-interactive mode");
             }
-            rpassword::prompt_password("Password: ")
-                .context("failed to read password")?
+            rpassword::prompt_password("Password: ").context("failed to read password")?
         }
     };
 
@@ -35,8 +34,7 @@ pub async fn login(
         .await
         .context("login failed")?;
 
-    credential::store_account(&account)
-        .context("failed to store credentials")?;
+    credential::store_account(&account).context("failed to store credentials")?;
 
     client.set_account(account.clone());
 
@@ -55,8 +53,7 @@ pub async fn info(format: OutputFormat) -> Result<()> {
 }
 
 pub async fn revoke() -> Result<()> {
-    credential::delete_account()
-        .context("failed to delete credentials")?;
+    credential::delete_account().context("failed to delete credentials")?;
 
     eprintln!("Credentials removed");
     Ok(())

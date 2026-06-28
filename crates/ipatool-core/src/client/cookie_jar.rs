@@ -25,10 +25,7 @@ pub fn new_cookie_store(path: Option<&Path>) -> Result<Arc<CookieStoreMutex>, Cl
     Ok(Arc::new(CookieStoreMutex::new(store)))
 }
 
-pub fn save_cookie_store(
-    store: &CookieStoreMutex,
-    path: &Path,
-) -> Result<(), ClientError> {
+pub fn save_cookie_store(store: &CookieStoreMutex, path: &Path) -> Result<(), ClientError> {
     let mut file = std::fs::File::create(path)
         .map_err(|e| ClientError::UnexpectedResponse(format!("cookie file create: {e}")))?;
     let guard = store.lock().unwrap();
