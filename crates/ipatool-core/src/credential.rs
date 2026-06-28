@@ -8,9 +8,7 @@ pub fn store_account(account: &Account) -> Result<(), IpaError> {
     let entry = keyring::Entry::new(SERVICE_NAME, ACCOUNT_KEY)?;
     let json = serde_json::to_string(account)
         .map_err(|e| IpaError::Other(format!("failed to serialize account: {e}")))?;
-    entry
-        .set_password(&json)
-        .map_err(|e| IpaError::Keyring(e))?;
+    entry.set_password(&json).map_err(IpaError::Keyring)?;
     Ok(())
 }
 

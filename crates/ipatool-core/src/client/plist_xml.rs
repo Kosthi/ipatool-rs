@@ -4,11 +4,11 @@ pub fn normalize_plist_xml(body: &[u8]) -> Vec<u8> {
     let text = String::from_utf8_lossy(body);
     let text = text.trim();
 
-    if let Some(start) = text.find("<plist") {
-        if let Some(end) = text.rfind("</plist>") {
-            let plist_content = &text[start..end + "</plist>".len()];
-            return plist_content.as_bytes().to_vec();
-        }
+    if let Some(start) = text.find("<plist")
+        && let Some(end) = text.rfind("</plist>")
+    {
+        let plist_content = &text[start..end + "</plist>".len()];
+        return plist_content.as_bytes().to_vec();
     }
 
     if text.starts_with("<?xml") || text.starts_with("<plist") {
@@ -45,9 +45,7 @@ pub fn normalize_plist_xml(body: &[u8]) -> Vec<u8> {
     body.to_vec()
 }
 
-pub fn parse_plist_response<T: serde::de::DeserializeOwned>(
-    body: &[u8],
-) -> Result<T, ClientError> {
+pub fn parse_plist_response<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, ClientError> {
     let normalized = normalize_plist_xml(body);
     let cursor = std::io::Cursor::new(&normalized);
     plist::from_reader(cursor).map_err(ClientError::PlistDe)

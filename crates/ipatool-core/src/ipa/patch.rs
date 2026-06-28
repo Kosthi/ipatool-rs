@@ -19,8 +19,7 @@ pub fn patch_ipa(
 
     for i in 0..src_zip.len() {
         let mut entry = src_zip.by_index(i)?;
-        let opts = zip::write::SimpleFileOptions::default()
-            .compression_method(entry.compression());
+        let opts = zip::write::SimpleFileOptions::default().compression_method(entry.compression());
         if entry.is_dir() {
             dest_zip.add_directory(entry.name().to_string(), opts)?;
         } else {
@@ -47,21 +46,15 @@ fn write_itunes_metadata(
     for (k, v) in metadata {
         meta_dict.insert(k.clone(), v.clone());
     }
-    meta_dict.insert(
-        "apple-id".into(),
-        plist::Value::String(email.into()),
-    );
-    meta_dict.insert(
-        "userName".into(),
-        plist::Value::String(email.into()),
-    );
+    meta_dict.insert("apple-id".into(), plist::Value::String(email.into()));
+    meta_dict.insert("userName".into(), plist::Value::String(email.into()));
 
     let mut buf = Vec::new();
     plist::to_writer_binary(&mut buf, &meta_dict)
         .map_err(|e| IpaError::Other(format!("plist serialize: {e}")))?;
 
-    let opts = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let opts =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     zip.start_file("iTunesMetadata.plist", opts)?;
     zip.write_all(&buf)?;
 

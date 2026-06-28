@@ -12,11 +12,7 @@ pub struct HttpReader {
 
 impl HttpReader {
     pub async fn new(client: &reqwest::Client, url: &str) -> Result<Self, ClientError> {
-        let resp = client
-            .get(url)
-            .header("Range", "bytes=0-0")
-            .send()
-            .await?;
+        let resp = client.get(url).header("Range", "bytes=0-0").send().await?;
 
         let size = resp
             .headers()
@@ -62,7 +58,7 @@ impl Read for HttpReader {
                     .bytes()
                     .await
             })
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
 
         let n = resp.len();
         buf[..n].copy_from_slice(&resp);

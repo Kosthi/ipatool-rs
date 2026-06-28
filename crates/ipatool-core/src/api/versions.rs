@@ -78,28 +78,26 @@ pub async fn list_versions(
         }
     }
 
-    if let Some(plist::Value::Array(items)) = dict.get("songList") {
-        if let Some(first) = items.first() {
-            if let Some(avail) = first
-                .as_dictionary()
-                .and_then(|d| d.get("externalVersionIdentifiers"))
-                .and_then(|v| v.as_array())
-            {
-                versions.clear();
-                for v in avail {
-                    let id_str = match v {
-                        plist::Value::Integer(i) => {
-                            i.as_signed().map(|n| n.to_string()).unwrap_or_default()
-                        }
-                        plist::Value::String(s) => s.clone(),
-                        _ => continue,
-                    };
-                    versions.push(VersionEntry {
-                        external_version_id: id_str,
-                        version_string: None,
-                    });
+    if let Some(plist::Value::Array(items)) = dict.get("songList")
+        && let Some(first) = items.first()
+        && let Some(avail) = first
+            .as_dictionary()
+            .and_then(|d| d.get("externalVersionIdentifiers"))
+            .and_then(|v| v.as_array())
+    {
+        versions.clear();
+        for v in avail {
+            let id_str = match v {
+                plist::Value::Integer(i) => {
+                    i.as_signed().map(|n| n.to_string()).unwrap_or_default()
                 }
-            }
+                plist::Value::String(s) => s.clone(),
+                _ => continue,
+            };
+            versions.push(VersionEntry {
+                external_version_id: id_str,
+                version_string: None,
+            });
         }
     }
 

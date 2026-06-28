@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -5,8 +7,8 @@ use anyhow::{Context, Result};
 use ipatool_core::api;
 use ipatool_core::client::AppleClient;
 use ipatool_core::ipa::patch;
-use ipatool_core::model::{Account, Platform};
 use ipatool_core::model::storefront::country_code_from_store_front;
+use ipatool_core::model::{Account, Platform};
 
 pub async fn download(
     client: &AppleClient,
@@ -23,8 +25,9 @@ pub async fn download(
     let resolved_app_id = match app_id {
         Some(id) => id,
         None => {
-            let bid = bundle_identifier
-                .ok_or_else(|| anyhow::anyhow!("either --bundle-identifier or --app-id is required"))?;
+            let bid = bundle_identifier.ok_or_else(|| {
+                anyhow::anyhow!("either --bundle-identifier or --app-id is required")
+            })?;
             let app = api::lookup::lookup(client, bid, country, platform)
                 .await
                 .context("lookup failed")?
@@ -42,10 +45,9 @@ pub async fn download(
     }
 
     eprintln!("Requesting download info...");
-    let item =
-        api::download::get_download_info(client, resolved_app_id, account, version_id)
-            .await
-            .context("failed to get download info")?;
+    let item = api::download::get_download_info(client, resolved_app_id, account, version_id)
+        .await
+        .context("failed to get download info")?;
 
     let version = item
         .metadata
@@ -64,8 +66,7 @@ pub async fn download(
         .context("download failed")?;
 
     eprintln!("Patching IPA...");
-    patch::patch_ipa(&tmp_path, &dest, &item, &account.email)
-        .context("failed to patch IPA")?;
+    patch::patch_ipa(&tmp_path, &dest, &item, &account.email).context("failed to patch IPA")?;
 
     std::fs::remove_file(&tmp_path).ok();
 

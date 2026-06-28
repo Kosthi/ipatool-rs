@@ -41,17 +41,16 @@ pub async fn login(
         let status = resp.status();
         tracing::debug!(%status, "auth response status");
 
-        if status == reqwest::StatusCode::FOUND {
-            if let Some(location) = resp.headers().get("location") {
-                let new_url = location
-                    .to_str()
-                    .map_err(|_| ClientError::MissingHeader("location (invalid)".into()))?;
-                tracing::debug!(new_url, "following redirect");
-                current_url = Url::parse(new_url).map_err(|e| {
-                    ClientError::UnexpectedResponse(format!("redirect URL: {e}"))
-                })?;
-                continue;
-            }
+        if status == reqwest::StatusCode::FOUND
+            && let Some(location) = resp.headers().get("location")
+        {
+            let new_url = location
+                .to_str()
+                .map_err(|_| ClientError::MissingHeader("location (invalid)".into()))?;
+            tracing::debug!(new_url, "following redirect");
+            current_url = Url::parse(new_url)
+                .map_err(|e| ClientError::UnexpectedResponse(format!("redirect URL: {e}")))?;
+            continue;
         }
 
         let store_front = resp
@@ -135,12 +134,7 @@ pub async fn login(
     }
 }
 
-fn build_auth_plist(
-    email: &str,
-    password: &str,
-    guid: &str,
-    attempt: u32,
-) -> plist::Dictionary {
+fn build_auth_plist(email: &str, password: &str, guid: &str, attempt: u32) -> plist::Dictionary {
     let mut dict = plist::Dictionary::new();
     dict.insert("appleId".into(), plist::Value::String(email.into()));
     dict.insert("attempt".into(), plist::Value::String(attempt.to_string()));
