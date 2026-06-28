@@ -1,0 +1,25 @@
+[package]
+name = "ipatool-core"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "stream"] }
+plist = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+cookie_store = "0.21"
+reqwest_cookie_store = "0.8"
+url = "2"
+bytes = "1"
+futures-util = "0.3"
+phf = { version = "0.11", features = ["macros"] }
+mac_address = "1"
+indicatif = "0.17"

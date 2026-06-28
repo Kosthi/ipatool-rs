@@ -1,0 +1,21 @@
+[package]
+name = "ipatool-cli"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ipatool"
+path = "src/main.rs"
+
+[dependencies]
+ipatool-core = { path = "../ipatool-core" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+clap = { version = "4", features = ["derive", "env"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rpassword = "7"
