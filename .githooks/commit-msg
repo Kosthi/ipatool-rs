@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Conventional Commits validation hook
+# Setup: git config core.hooksPath .githooks
+
+commit_msg_file="$1"
+commit_msg=$(head -1 "$commit_msg_file")
+
+# Skip merge commits and revert commits
+if echo "$commit_msg" | grep -qE "^(Merge|Revert) "; then
+    exit 0
+fi
+
+# Conventional Commits pattern
+pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?(!)?: .{1,}"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+    echo ""
+    echo "❌ Commit message does not follow Conventional Commits"
+    echo ""
+    echo "  Format: <type>(<scope>): <subject>"
+    echo ""
+    echo "  type:  feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert"
+    echo "  scope: core | cli | deps (optional)"
+    echo ""
+    echo "  Examples:"
+    echo "    feat(core): add App Store search API"
+    echo "    fix(cli): handle download timeout"
+    echo "    docs: update README"
+    echo ""
+    exit 1
+fi
+
+# Check subject length (entire first line should be <= 72 chars)
+if [ ${#commit_msg} -gt 72 ]; then
+    echo ""
+    echo "⚠️  Commit subject exceeds 72 characters (currently ${#commit_msg})"
+    echo "  Please shorten the subject; use the body for details."
+    echo ""
+    exit 1
+fi
+
+exit 0
