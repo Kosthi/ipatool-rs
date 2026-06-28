@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 """
 body = """
 {%- macro remote_url() -%}
-  https://github.com/pinkx1/ipatool-rs
+  https://github.com/Kosthi/ipatool-rs
 {%- endmacro -%}
 
 {% if version -%}
@@ -35,7 +35,7 @@ body = """
 """
 footer = """
 {%- macro remote_url() -%}
-  https://github.com/pinkx1/ipatool-rs
+  https://github.com/Kosthi/ipatool-rs
 {%- endmacro -%}
 
 {% for release in releases -%}
@@ -63,7 +63,7 @@ topo_order = false
 sort_commits = "newest"
 
 commit_preprocessors = [
-    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](https://github.com/pinkx1/ipatool-rs/issues/${2}))" },
+    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](https://github.com/Kosthi/ipatool-rs/issues/${2}))" },
 ]
 
 commit_parsers = [
