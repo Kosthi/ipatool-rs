@@ -120,13 +120,15 @@ ipatool purchase -b com.tencent.xin
 ```
 
 Download an IPA file. Use `--purchase` to automatically obtain the license before downloading.
+By default, the IPA is saved in the current working directory as `{bundle_id}_{app_id}_{version}.ipa`.
+Use `-o` to choose a different output path.
 
 ```bash
 # Download with auto-purchase
 ipatool download -b com.tencent.xin --purchase
 
 # Specify output path
-ipatool download -b com.tencent.xin --purchase -o wechat.ipa
+ipatool download -b com.tencent.xin --purchase -o ~/Downloads/wechat.ipa
 
 # Download by app ID
 ipatool download -i 414478124 --purchase
