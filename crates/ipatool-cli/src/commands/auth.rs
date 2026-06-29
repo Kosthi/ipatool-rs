@@ -3,6 +3,7 @@ use anyhow::{Context, Result, bail};
 use ipatool_core::api;
 use ipatool_core::client::AppleClient;
 use ipatool_core::credential;
+use ipatool_core::error::{ClientError, StoreError};
 
 use crate::output::{OutputFormat, print_account};
 
@@ -30,9 +31,41 @@ pub async fn login(
 
     tracing::info!(url = %auth_url, "using auth endpoint");
 
-    let mut account = api::auth::login(client, email, &password, auth_code, &auth_url)
-        .await
-        .context("login failed")?;
+    let mut account = match api::auth::login(client, email, &password, auth_code, &auth_url).await {
+        Ok(account) => account,
+        Err(ClientError::Store(StoreError::AuthCodeRequired))
+            if auth_code.is_none() && !non_interactive =>
+        {
+            eprintln!(
+                "Apple rejected the login. If Apple is showing a two-factor code, enter it now; otherwise press Enter and check your password."
+            );
+            let auth_code = rpassword::prompt_password("Two-factor code (optional): ")
+                .context("failed to read 2FA code")?;
+            let auth_code = auth_code.trim();
+            if auth_code.is_empty() {
+                bail!(
+                    "login rejected; check your password, or rerun with --auth-code <code> if Apple is asking for two-factor authentication"
+                );
+            }
+
+            match api::auth::login(client, email, &password, Some(auth_code), &auth_url).await {
+                Ok(account) => account,
+                Err(ClientError::Store(StoreError::AuthCodeRequired)) => {
+                    bail!("login rejected; check your password and 2FA code")
+                }
+                Err(e) => return Err(e).context("login failed"),
+            }
+        }
+        Err(ClientError::Store(StoreError::AuthCodeRequired)) if auth_code.is_none() => {
+            bail!(
+                "login rejected; check your password, or rerun with --auth-code <code> if Apple is asking for two-factor authentication"
+            )
+        }
+        Err(ClientError::Store(StoreError::AuthCodeRequired)) => {
+            bail!("login rejected; check your password and 2FA code")
+        }
+        Err(e) => return Err(e).context("login failed"),
+    };
 
     account.password = Some(password);
     credential::store_account(&account).context("failed to store credentials")?;

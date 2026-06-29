@@ -180,7 +180,6 @@ fn handle_account_normal(app: &mut App_, key: KeyEvent) {
                 app.input_mode = InputMode::LoginEmail;
                 app.login_error = None;
                 app.login_auth_code = tui_input::Input::default();
-                app.login_needs_auth_code = false;
             }
         }
         KeyCode::Char('r') if app.account.is_some() => {
@@ -224,14 +223,10 @@ fn handle_login_email(app: &mut App_, key: KeyEvent) {
 fn handle_login_password(app: &mut App_, key: KeyEvent) {
     match key.code {
         KeyCode::Enter => {
-            if app.login_needs_auth_code {
-                app.input_mode = InputMode::LoginAuthCode;
-            } else {
-                app.input_mode = InputMode::Normal;
-                app.action_tx.send(Action::SubmitLogin).ok();
-            }
+            app.input_mode = InputMode::Normal;
+            app.action_tx.send(Action::SubmitLogin).ok();
         }
-        KeyCode::Tab if app.login_needs_auth_code => {
+        KeyCode::Tab => {
             app.input_mode = InputMode::LoginAuthCode;
         }
         KeyCode::Esc => {
@@ -252,6 +247,12 @@ fn handle_login_auth_code(app: &mut App_, key: KeyEvent) {
         KeyCode::Enter => {
             app.input_mode = InputMode::Normal;
             app.action_tx.send(Action::SubmitLogin).ok();
+        }
+        KeyCode::Tab => {
+            app.input_mode = InputMode::LoginEmail;
+        }
+        KeyCode::BackTab => {
+            app.input_mode = InputMode::LoginPassword;
         }
         KeyCode::Esc => {
             app.input_mode = InputMode::Normal;

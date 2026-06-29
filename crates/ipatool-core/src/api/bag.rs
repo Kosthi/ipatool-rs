@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use url::Url;
 
@@ -6,9 +7,15 @@ use crate::client::AppleClient;
 use crate::error::ClientError;
 
 const BAG_URL: &str = "https://init.itunes.apple.com/bag.xml?ix=5";
+const BAG_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn fetch_auth_endpoint(client: &AppleClient) -> Result<Url, ClientError> {
-    let resp = client.http().get(BAG_URL).send().await?;
+    let resp = client
+        .http()
+        .get(BAG_URL)
+        .timeout(BAG_REQUEST_TIMEOUT)
+        .send()
+        .await?;
     let body = resp.bytes().await?;
 
     let outer: HashMap<String, plist::Value> =

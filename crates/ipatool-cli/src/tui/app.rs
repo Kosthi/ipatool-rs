@@ -106,7 +106,6 @@ pub struct App_ {
     pub login_email: Input,
     pub login_password: String,
     pub login_auth_code: Input,
-    pub login_needs_auth_code: bool,
     pub login_error: Option<String>,
 
     pub client: Arc<Mutex<AppleClient>>,
@@ -155,7 +154,6 @@ impl App_ {
             login_email: Input::default(),
             login_password: String::new(),
             login_auth_code: Input::default(),
-            login_needs_auth_code: false,
             login_error: None,
 
             client,

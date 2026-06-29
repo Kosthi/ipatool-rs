@@ -36,7 +36,6 @@ pub enum Action {
     ClearFinishedDownloads,
 
     SubmitLogin,
-    LoginNeedsAuthCode,
     LoginSuccess(Account),
     LoginError(String),
     Logout,

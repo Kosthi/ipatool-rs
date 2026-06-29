@@ -18,7 +18,7 @@ pub enum StoreError {
     LicenseAlreadyExists,
     #[error("device verification failed")]
     DeviceVerificationFailed,
-    #[error("2FA code required")]
+    #[error("login rejected; password may be wrong or a 2FA code may be required")]
     AuthCodeRequired,
     #[error("account disabled")]
     AccountDisabled,
