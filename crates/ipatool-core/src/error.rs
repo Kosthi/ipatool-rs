@@ -12,6 +12,8 @@ pub enum StoreError {
     LicenseNotFound,
     #[error("temporarily unavailable")]
     TemporarilyUnavailable,
+    #[error("purchase couldn't be completed")]
+    PurchaseFailed,
     #[error("license already exists")]
     LicenseAlreadyExists,
     #[error("device verification failed")]
@@ -33,7 +35,15 @@ impl StoreError {
             "2034" => Self::PasswordTokenExpired,
             "2042" => Self::SignInRequired,
             "9610" => Self::LicenseNotFound,
-            "2059" => Self::TemporarilyUnavailable,
+            // TODO: substring matching on customerMessage is locale-dependent; find a more stable signal
+            "2059" => {
+                let msg = customer_message.unwrap_or("");
+                if msg.contains("completed") || msg.contains("not available") {
+                    Self::PurchaseFailed
+                } else {
+                    Self::TemporarilyUnavailable
+                }
+            }
             "5002" => Self::LicenseAlreadyExists,
             "1008" => Self::DeviceVerificationFailed,
             "" => {
@@ -58,6 +68,13 @@ impl StoreError {
 
     pub fn is_retryable(&self) -> bool {
         matches!(self, Self::InvalidCredentials)
+    }
+
+    pub fn is_token_expired(&self) -> bool {
+        matches!(
+            self,
+            Self::PasswordTokenExpired | Self::SignInRequired | Self::DeviceVerificationFailed
+        )
     }
 
     pub fn from_plist_dict(dict: &HashMap<String, plist::Value>) -> Option<Self> {
@@ -99,6 +116,20 @@ pub enum ClientError {
     MissingHeader(String),
     #[error("unexpected response: {0}")]
     UnexpectedResponse(String),
+}
+
+impl ClientError {
+    pub fn is_token_expired(&self) -> bool {
+        matches!(self, Self::Store(e) if e.is_token_expired())
+    }
+
+    pub fn is_license_not_found(&self) -> bool {
+        matches!(self, Self::Store(StoreError::LicenseNotFound))
+    }
+
+    pub fn is_license_already_exists(&self) -> bool {
+        matches!(self, Self::Store(StoreError::LicenseAlreadyExists))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

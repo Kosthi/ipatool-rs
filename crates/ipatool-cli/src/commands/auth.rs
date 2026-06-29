@@ -30,10 +30,11 @@ pub async fn login(
 
     tracing::info!(url = %auth_url, "using auth endpoint");
 
-    let account = api::auth::login(client, email, &password, auth_code, &auth_url)
+    let mut account = api::auth::login(client, email, &password, auth_code, &auth_url)
         .await
         .context("login failed")?;
 
+    account.password = Some(password);
     credential::store_account(&account).context("failed to store credentials")?;
 
     client.set_account(account.clone());

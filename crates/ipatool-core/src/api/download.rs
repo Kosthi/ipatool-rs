@@ -41,7 +41,34 @@ mod serde_bytes {
     }
 }
 
+const MAX_DOWNLOAD_ATTEMPTS: u32 = 3;
+
 pub async fn get_download_info(
+    client: &AppleClient,
+    app_id: i64,
+    account: &Account,
+    external_version_id: Option<&str>,
+) -> Result<DownloadItem, ClientError> {
+    for attempt in 0..MAX_DOWNLOAD_ATTEMPTS {
+        match try_get_download_info(client, app_id, account, external_version_id).await {
+            Err(ClientError::Store(StoreError::TemporarilyUnavailable))
+                if attempt + 1 < MAX_DOWNLOAD_ATTEMPTS =>
+            {
+                let delay = 5 * (attempt as u64 + 1);
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    delay,
+                    "temporarily unavailable, retrying"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            }
+            other => return other,
+        }
+    }
+    Err(ClientError::Store(StoreError::TemporarilyUnavailable))
+}
+
+async fn try_get_download_info(
     client: &AppleClient,
     app_id: i64,
     account: &Account,

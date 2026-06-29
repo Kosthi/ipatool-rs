@@ -4,18 +4,39 @@ use crate::client::AppleClient;
 use crate::error::{ClientError, StoreError};
 use crate::model::Account;
 
+const MAX_PURCHASE_ATTEMPTS: u32 = 3;
+
 pub async fn purchase(
     client: &AppleClient,
     app_id: i64,
     account: &Account,
 ) -> Result<(), ClientError> {
-    match try_purchase(client, app_id, account, "STDQ").await {
-        Err(ClientError::Store(StoreError::TemporarilyUnavailable)) => {
-            tracing::info!("STDQ unavailable, trying GAME pricing");
-            try_purchase(client, app_id, account, "GAME").await
+    for attempt in 0..MAX_PURCHASE_ATTEMPTS {
+        let result = match try_purchase(client, app_id, account, "STDQ").await {
+            Err(ClientError::Store(StoreError::TemporarilyUnavailable)) => {
+                tracing::info!("STDQ unavailable, trying GAME pricing");
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                try_purchase(client, app_id, account, "GAME").await
+            }
+            other => other,
+        };
+
+        match result {
+            Err(ClientError::Store(StoreError::TemporarilyUnavailable))
+                if attempt + 1 < MAX_PURCHASE_ATTEMPTS =>
+            {
+                let delay = 5 * (attempt as u64 + 1);
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    delay,
+                    "temporarily unavailable, retrying"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            }
+            other => return other,
         }
-        other => other,
     }
+    Err(ClientError::Store(StoreError::TemporarilyUnavailable))
 }
 
 async fn try_purchase(
@@ -81,6 +102,12 @@ async fn try_purchase(
         .await?;
 
     let resp_body = resp.bytes().await?;
+    tracing::debug!(
+        len = resp_body.len(),
+        preview = %String::from_utf8_lossy(&resp_body[..resp_body.len().min(500)]),
+        pricing = pricing_parameters,
+        "purchase response body"
+    );
     let dict: HashMap<String, plist::Value> =
         crate::client::plist_xml::parse_plist_response(&resp_body)?;
 
