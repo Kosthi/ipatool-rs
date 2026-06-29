@@ -130,6 +130,7 @@ pub async fn login(
             name,
             store_front: sf,
             pod,
+            password: None,
         });
     }
 }

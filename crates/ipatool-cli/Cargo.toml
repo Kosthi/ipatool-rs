@@ -19,3 +19,8 @@ tracing.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rpassword = "7"
+ratatui.workspace = true
+crossterm.workspace = true
+tui-input.workspace = true
+futures-util = "0.3"
+tokio-util.workspace = true

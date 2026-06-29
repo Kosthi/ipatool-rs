@@ -1,5 +1,6 @@
 mod commands;
 mod output;
+mod tui;
 
 use std::path::PathBuf;
 
@@ -21,7 +22,7 @@ use output::OutputFormat;
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
     #[arg(long, global = true, default_value = "text")]
     format: OutputFormat,
     #[arg(long, global = true)]
@@ -118,16 +119,20 @@ async fn main() -> Result<()> {
         .with_target(false)
         .init();
 
+    let Some(command) = cli.command else {
+        return tui::run().await;
+    };
+
     let guid_str = guid::generate_guid().context("failed to generate GUID")?;
 
-    let data_dir = dirs();
+    let data_dir = data_dir();
     std::fs::create_dir_all(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
     let mut client = ipatool_core::client::AppleClient::new(guid_str, Some(&cookie_path))
         .context("failed to create client")?;
 
-    match cli.command {
+    match command {
         Commands::Auth { action } => match action {
             AuthAction::Login {
                 email,
@@ -223,7 +228,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn dirs() -> std::path::PathBuf {
+pub(crate) fn data_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     std::path::PathBuf::from(home).join(".ipatool")
 }

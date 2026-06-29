@@ -10,6 +10,10 @@ use ipatool_core::ipa::patch;
 use ipatool_core::model::storefront::country_code_from_store_front;
 use ipatool_core::model::{Account, Platform};
 
+use super::reauth_or_fail;
+
+const MAX_ATTEMPTS: u32 = 3;
+
 pub async fn download(
     client: &AppleClient,
     bundle_identifier: Option<&str>,
@@ -20,6 +24,7 @@ pub async fn download(
     platform: Platform,
     account: &Account,
 ) -> Result<()> {
+    let mut account = account.clone();
     let country = country_code_from_store_front(&account.store_front).unwrap_or("US");
 
     let resolved_app_id = match app_id {
@@ -37,17 +42,51 @@ pub async fn download(
         }
     };
 
-    if do_purchase {
-        eprintln!("Obtaining license...");
-        api::purchase::purchase(client, resolved_app_id, account)
-            .await
-            .context("purchase failed")?;
+    eprintln!("Requesting download info...");
+    let mut item = None;
+    let mut purchase_attempted = false;
+    let mut last_download_error = None;
+
+    for attempt in 0..MAX_ATTEMPTS {
+        match api::download::get_download_info(client, resolved_app_id, &account, version_id).await
+        {
+            Ok(i) => {
+                item = Some(i);
+                break;
+            }
+            Err(e) if e.is_license_not_found() && do_purchase && !purchase_attempted => {
+                last_download_error = Some(e.to_string());
+                eprintln!("License not found, purchasing...");
+                purchase_for_download(client, resolved_app_id, &mut account).await?;
+                purchase_attempted = true;
+                eprintln!("Purchase successful");
+            }
+            Err(e) if e.is_license_not_found() && do_purchase => {
+                return Err(e).context("license not found after purchase");
+            }
+            Err(e) if e.is_token_expired() && attempt + 1 < MAX_ATTEMPTS => {
+                last_download_error = Some(e.to_string());
+                eprintln!(
+                    "Token expired, re-authenticating (attempt {})...",
+                    attempt + 1
+                );
+                account = reauth_or_fail(client, &account).await?;
+            }
+            Err(e) if e.is_license_not_found() => {
+                return Err(e).context("license not found (use --purchase to acquire)");
+            }
+            Err(e) => {
+                return Err(e).context("failed to get download info");
+            }
+        }
     }
 
-    eprintln!("Requesting download info...");
-    let item = api::download::get_download_info(client, resolved_app_id, account, version_id)
-        .await
-        .context("failed to get download info")?;
+    let item = item.with_context(|| {
+        last_download_error.map_or_else(
+            || "failed to get download info after retries".to_string(),
+            |e| format!("failed to get download info after retries: {e}"),
+        )
+    })?;
 
     let version = item
         .metadata
@@ -72,4 +111,22 @@ pub async fn download(
 
     eprintln!("Saved to {}", dest.display());
     Ok(())
+}
+
+async fn purchase_for_download(
+    client: &AppleClient,
+    app_id: i64,
+    account: &mut Account,
+) -> Result<()> {
+    match api::purchase::purchase(client, app_id, account).await {
+        Ok(()) => Ok(()),
+        Err(e) if e.is_token_expired() => {
+            *account = reauth_or_fail(client, account).await?;
+            api::purchase::purchase(client, app_id, account)
+                .await
+                .context("purchase failed after re-auth")
+        }
+        Err(e) if e.is_license_already_exists() => Ok(()),
+        Err(e) => Err(e).context("purchase failed"),
+    }
 }

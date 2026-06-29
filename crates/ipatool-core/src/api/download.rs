@@ -41,7 +41,34 @@ mod serde_bytes {
     }
 }
 
+const MAX_DOWNLOAD_ATTEMPTS: u32 = 3;
+
 pub async fn get_download_info(
+    client: &AppleClient,
+    app_id: i64,
+    account: &Account,
+    external_version_id: Option<&str>,
+) -> Result<DownloadItem, ClientError> {
+    for attempt in 0..MAX_DOWNLOAD_ATTEMPTS {
+        match try_get_download_info(client, app_id, account, external_version_id).await {
+            Err(ClientError::Store(StoreError::TemporarilyUnavailable))
+                if attempt + 1 < MAX_DOWNLOAD_ATTEMPTS =>
+            {
+                let delay = 5 * (attempt as u64 + 1);
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    delay,
+                    "temporarily unavailable, retrying"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            }
+            other => return other,
+        }
+    }
+    Err(ClientError::Store(StoreError::TemporarilyUnavailable))
+}
+
+async fn try_get_download_info(
     client: &AppleClient,
     app_id: i64,
     account: &Account,
@@ -58,6 +85,7 @@ pub async fn get_download_info(
         "guid".into(),
         plist::Value::String(client.guid().to_string()),
     );
+    body.insert("creditDisplay".into(), plist::Value::String(String::new()));
 
     if let Some(vid) = external_version_id {
         body.insert(
@@ -81,11 +109,9 @@ pub async fn get_download_info(
     let resp = client
         .http()
         .post(&url)
-        .header("Content-Type", "application/x-www-form-urlencoded")
+        .header("Content-Type", "application/x-apple-plist")
         .header("iCloud-DSID", &account.directory_services_id)
         .header("X-Dsid", &account.directory_services_id)
-        .header("X-Apple-Store-Front", &account.store_front)
-        .header("X-Token", &account.password_token)
         .body(body_bytes)
         .send()
         .await?;
@@ -102,20 +128,49 @@ pub async fn get_download_info(
     let dict: HashMap<String, plist::Value> =
         crate::client::plist_xml::parse_plist_response(&resp_body)?;
 
-    if let Some(err) = StoreError::from_plist_dict(&dict) {
-        return Err(ClientError::Store(err));
-    }
+    download_item_from_response_dict(&dict)
+}
 
-    let song_list = dict
-        .get("songList")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| ClientError::UnexpectedResponse("missing songList".into()))?;
+fn download_item_from_response_dict(
+    dict: &HashMap<String, plist::Value>,
+) -> Result<DownloadItem, ClientError> {
+    match StoreError::from_plist_dict(dict) {
+        Some(StoreError::LicenseAlreadyExists) => {
+            if let Some(item) = download_item_from_dict(dict)? {
+                Ok(item)
+            } else {
+                Err(ClientError::Store(StoreError::PasswordTokenExpired))
+            }
+        }
+        Some(err) => Err(ClientError::Store(err)),
+        None => {
+            if let Some(item) = download_item_from_dict(dict)? {
+                Ok(item)
+            } else {
+                Err(ClientError::UnexpectedResponse("missing songList".into()))
+            }
+        }
+    }
+}
+
+fn download_item_from_dict(
+    dict: &HashMap<String, plist::Value>,
+) -> Result<Option<DownloadItem>, ClientError> {
+    let Some(song_list) = dict.get("songList") else {
+        return Ok(None);
+    };
+
+    let song_list = song_list
+        .as_array()
+        .ok_or_else(|| ClientError::UnexpectedResponse("invalid songList".into()))?;
 
     let first = song_list
         .first()
         .ok_or_else(|| ClientError::UnexpectedResponse("empty songList".into()))?;
 
-    plist::from_value(first).map_err(ClientError::PlistDe)
+    plist::from_value(first)
+        .map(Some)
+        .map_err(ClientError::PlistDe)
 }
 
 pub async fn download_file(
@@ -212,4 +267,61 @@ fn download_url(account: &Account, guid: &str) -> String {
         None => "buy.itunes.apple.com".to_string(),
     };
     format!("https://{host}/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid={guid}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_download_item() -> plist::Value {
+        let mut sinf = plist::Dictionary::new();
+        sinf.insert("id".into(), plist::Value::Integer(1.into()));
+        sinf.insert("sinf".into(), plist::Value::Data(vec![1, 2, 3]));
+
+        let mut item = plist::Dictionary::new();
+        item.insert(
+            "URL".into(),
+            plist::Value::String("https://example.invalid/app.ipa".into()),
+        );
+        item.insert(
+            "sinfs".into(),
+            plist::Value::Array(vec![plist::Value::Dictionary(sinf)]),
+        );
+
+        plist::Value::Dictionary(item)
+    }
+
+    #[test]
+    fn download_item_wins_over_license_already_exists_marker() {
+        let mut dict = HashMap::new();
+        dict.insert("failureType".into(), plist::Value::String("5002".into()));
+        dict.insert(
+            "customerMessage".into(),
+            plist::Value::String("license already exists".into()),
+        );
+        dict.insert(
+            "songList".into(),
+            plist::Value::Array(vec![sample_download_item()]),
+        );
+
+        let item = download_item_from_response_dict(&dict).unwrap();
+
+        assert_eq!(item.url, "https://example.invalid/app.ipa");
+        assert_eq!(item.sinfs[0].id, 1);
+        assert_eq!(item.sinfs[0].sinf, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn bare_license_already_exists_requires_reauth_for_download() {
+        let mut dict = HashMap::new();
+        dict.insert("failureType".into(), plist::Value::String("5002".into()));
+        dict.insert(
+            "customerMessage".into(),
+            plist::Value::String("license already exists".into()),
+        );
+
+        let err = download_item_from_response_dict(&dict).unwrap_err();
+
+        assert!(err.is_token_expired());
+    }
 }

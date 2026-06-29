@@ -20,9 +20,16 @@ pub async fn purchase(
 
     eprintln!("Purchasing {} ({})", app.name, app.id);
 
-    api::purchase::purchase(client, app.id, account)
-        .await
-        .context("purchase failed")?;
+    match api::purchase::purchase(client, app.id, account).await {
+        Ok(()) => {}
+        Err(e) if e.is_token_expired() => {
+            let new_account = super::reauth_or_fail(client, account).await?;
+            api::purchase::purchase(client, app.id, &new_account)
+                .await
+                .context("purchase failed after re-auth")?;
+        }
+        Err(e) => return Err(e).context("purchase failed"),
+    }
 
     eprintln!("Done");
     Ok(())
