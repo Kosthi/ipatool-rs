@@ -1,5 +1,3 @@
-# ipatool-rs
-
 <p align="center">
   <img src="media/logo.svg" alt="ipatool-rs" width="620">
 </p>
