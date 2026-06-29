@@ -16,16 +16,30 @@ pub async fn list(
 ) -> Result<()> {
     let resolved_app_id = resolve_app_id(client, app_id, bundle_identifier, account).await?;
 
-    let result = api::versions::list_versions(client, resolved_app_id, account)
-        .await
-        .context("failed to list versions")?;
+    let result = match api::versions::list_versions(client, resolved_app_id, account).await {
+        Ok(result) => result,
+        Err(e) if e.is_license_not_found() => {
+            return Err(license_not_found_error(bundle_identifier));
+        }
+        Err(e) => return Err(e).context("failed to list versions"),
+    };
 
     match format {
         OutputFormat::Text => {
             eprintln!("Versions for app {}:", result.app_id);
             for v in &result.versions {
-                let ver = v.version_string.as_deref().unwrap_or("?");
-                println!("  {} (version: {})", v.external_version_id, ver);
+                let latest = result.latest_external_version_id.as_deref()
+                    == Some(v.external_version_id.as_str());
+                match (v.version_string.as_deref(), latest) {
+                    (Some(ver), true) => {
+                        println!("  {} (version: {}, latest)", v.external_version_id, ver)
+                    }
+                    (Some(ver), false) => {
+                        println!("  {} (version: {})", v.external_version_id, ver)
+                    }
+                    (None, true) => println!("  {} (latest)", v.external_version_id),
+                    (None, false) => println!("  {}", v.external_version_id),
+                }
             }
             if result.versions.is_empty() {
                 eprintln!("  (no versions found)");
@@ -47,9 +61,16 @@ pub async fn meta(
 ) -> Result<()> {
     let resolved_app_id = resolve_app_id(client, app_id, bundle_identifier, account).await?;
 
-    let result = api::versions::get_version_metadata(client, resolved_app_id, account, version_id)
-        .await
-        .context("failed to get version metadata")?;
+    let result =
+        match api::versions::get_version_metadata(client, resolved_app_id, account, version_id)
+            .await
+        {
+            Ok(result) => result,
+            Err(e) if e.is_license_not_found() => {
+                return Err(license_not_found_error(bundle_identifier));
+            }
+            Err(e) => return Err(e).context("failed to get version metadata"),
+        };
 
     match format {
         OutputFormat::Text => {
@@ -88,5 +109,16 @@ async fn resolve_app_id(
                 .ok_or_else(|| anyhow::anyhow!("app not found: {bid}"))?;
             Ok(app.id)
         }
+    }
+}
+
+fn license_not_found_error(bundle_identifier: Option<&str>) -> anyhow::Error {
+    match bundle_identifier {
+        Some(bid) => anyhow::anyhow!(
+            "license not found for {bid}; run `ipatool purchase -b {bid}` first, then retry"
+        ),
+        None => anyhow::anyhow!(
+            "license not found; run `ipatool purchase -b <bundle-id>` first, then retry"
+        ),
     }
 }
