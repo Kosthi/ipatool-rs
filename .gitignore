@@ -23,3 +23,6 @@ target
 # Downloaded IPA files
 *.ipa
 *.ipa.tmp
+
+# Local release packaging output
+dist/

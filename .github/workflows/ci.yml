@@ -48,23 +48,28 @@ jobs:
       - run: cargo test --workspace
 
   build:
-    name: Build (${{ matrix.target }})
+    name: Build ${{ matrix.name }}
     needs: [fmt, clippy, test]
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          - name: Linux x64
+            target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-          - target: aarch64-unknown-linux-gnu
+          - name: Linux ARM64
+            target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
             cross: true
-          - target: x86_64-apple-darwin
+          - name: macOS Intel
+            target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - name: macOS Apple Silicon
+            target: aarch64-apple-darwin
             runner: macos-latest
-          - target: aarch64-apple-darwin
-            runner: macos-latest
-          - target: x86_64-pc-windows-msvc
+          - name: Windows x64
+            target: x86_64-pc-windows-msvc
             runner: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,10 +80,14 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Install cross
-        if: matrix.cross
+        if: ${{ matrix.cross }}
         run: cargo install cross --git https://github.com/cross-rs/cross
-      - name: Build
-        run: ${{ matrix.cross && 'cross' || 'cargo' }} build --release --target ${{ matrix.target }}
+      - name: Build with cargo
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Build with cross
+        if: ${{ matrix.cross }}
+        run: cross build --release --locked --target ${{ matrix.target }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

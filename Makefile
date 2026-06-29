@@ -8,21 +8,21 @@ changelog:
 changelog-preview:
 	git-cliff --unreleased
 
-# Tag a new release (usage: make release VERSION=0.2.0)
+# Tag a new release. Pushing the tag starts the GitHub Release workflow.
+# Usage: make release VERSION=0.1.0
 release:
-	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=0.2.0" && exit 1)
+	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=0.1.0" && exit 1)
+	@test -z "$$(git status --short)" || (echo "Working tree must be clean before tagging a release." && exit 1)
+	@grep -q '^version = "$(VERSION)"' Cargo.toml || (echo "Cargo.toml workspace version must be $(VERSION)." && exit 1)
+	@grep -q '^## \[$(VERSION)\]' CHANGELOG.md || (echo "CHANGELOG.md must contain a $(VERSION) section." && exit 1)
 	@echo "Releasing v$(VERSION)..."
-	cargo set-version $(VERSION)
-	git-cliff --tag v$(VERSION) --output CHANGELOG.md
-	git add -A
-	git commit -m "chore(release): v$(VERSION)"
 	git tag -a v$(VERSION) -m "v$(VERSION)"
-	@echo "Tagged v$(VERSION). Run 'git push --follow-tags' to publish."
+	@echo "Tagged v$(VERSION). Run 'git push origin HEAD --follow-tags' to publish."
 
 # Run checks
 check:
-	cargo fmt --check
-	cargo clippy -- -D warnings
+	cargo fmt --all --check
+	cargo clippy --all-targets --all-features -- -D warnings
 
 # Format code
 lint:
