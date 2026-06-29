@@ -8,7 +8,7 @@ changelog:
 changelog-preview:
 	git-cliff --unreleased
 
-# Tag a new release. Pushing the tag starts the GitHub Release workflow.
+# Tag a new release. Pushing the tag starts the cargo-dist GitHub Release workflow.
 # Usage: make release VERSION=0.1.0
 release:
 	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=0.1.0" && exit 1)

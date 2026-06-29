@@ -6,6 +6,10 @@ members = ["crates/ipatool-core", "crates/ipatool-cli"]
 edition = "2024"
 version = "0.1.0"
 license = "MIT"
+description = "A terminal UI and CLI for searching, purchasing, and downloading iOS App Store IPA files."
+repository = "https://github.com/Kosthi/ipatool-rs"
+homepage = "https://github.com/Kosthi/ipatool-rs"
+readme = "README.md"
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal"] }
@@ -18,3 +22,8 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 crossterm = { version = "0.29", features = ["event-stream"] }
 tui-input = "0.15"
 tokio-util = { version = "0.7", features = ["rt"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

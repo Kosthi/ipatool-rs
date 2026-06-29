@@ -3,6 +3,10 @@ name = "ipatool-core"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+description = "Core library for ipatool-rs App Store authentication, purchase, and download flows."
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
 
 [dependencies]
 tokio.workspace = true

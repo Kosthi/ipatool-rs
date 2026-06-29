@@ -1071,7 +1071,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipatool-cli"
+name = "ipatool"
 version = "0.1.0"
 dependencies = [
  "anyhow",

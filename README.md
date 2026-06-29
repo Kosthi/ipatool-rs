@@ -36,19 +36,35 @@ This rewrite adds a keyboard-driven terminal UI, structured Rust models, clearer
 
 ## Installation
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install Kosthi/tap/ipatool
+```
+
 ### Prebuilt Release Assets
 
 Download the latest files from the [GitHub Releases](https://github.com/Kosthi/ipatool-rs/releases) page.
 
+The release also includes `cargo-dist` installer scripts that install the `ipatool` binary into your Cargo bin directory.
+
+```bash
+# macOS / Linux
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.sh | sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.ps1 | iex"
+```
+
 | Platform | Asset | Install |
 |----------|-------|---------|
-| Windows x64 | `ipatool-<version>-x86_64-pc-windows-msvc.exe` | Rename to `ipatool.exe` and place it on your `PATH`, or download the `.zip` and run `powershell -ExecutionPolicy Bypass -File .\install.ps1`. |
-| macOS Apple Silicon | `ipatool-<version>-aarch64-apple-darwin.dmg` | Open the DMG and run `sudo ./install.sh` from the mounted volume. |
-| macOS Intel | `ipatool-<version>-x86_64-apple-darwin.dmg` | Open the DMG and run `sudo ./install.sh` from the mounted volume. |
-| Linux x64 | `ipatool-<version>-x86_64-unknown-linux-gnu.tar.gz` | Extract and run `sudo ./install.sh`. |
-| Linux ARM64 | `ipatool-<version>-aarch64-unknown-linux-gnu.tar.gz` | Extract and run `sudo ./install.sh`. |
+| Windows x64 | `ipatool-x86_64-pc-windows-msvc.zip` | Extract and place `ipatool.exe` on your `PATH`. |
+| macOS Apple Silicon | `ipatool-aarch64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| macOS Intel | `ipatool-x86_64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| Linux x64 | `ipatool-x86_64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| Linux ARM64 | `ipatool-aarch64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
 
-Each release also includes `SHA256SUMS` for verifying downloads.
+Each release also includes per-asset `.sha256` files and a unified `sha256.sum`.
 
 ### Build From Source
 
