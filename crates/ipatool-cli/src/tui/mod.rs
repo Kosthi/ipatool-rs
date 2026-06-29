@@ -695,7 +695,8 @@ async fn acquire_download_item(
     id: usize,
 ) -> Result<ipatool_core::api::download::DownloadItem, String> {
     let max_attempts = 3;
-    let mut purchased = false;
+    let mut purchase_attempted = false;
+    let mut last_error = None;
 
     for attempt in 0..max_attempts {
         let result = {
@@ -705,7 +706,8 @@ async fn acquire_download_item(
 
         match result {
             Ok(item) => return Ok(item),
-            Err(e) if e.is_license_not_found() && !purchased => {
+            Err(e) if e.is_license_not_found() && !purchase_attempted => {
+                last_error = Some(e.to_string());
                 tx.send(Action::DownloadProgress {
                     id,
                     stage: DownloadStage::Purchasing,
@@ -714,7 +716,7 @@ async fn acquire_download_item(
                 })
                 .ok();
                 purchase_for_download(client, app_id, account, tx).await?;
-                purchased = true;
+                purchase_attempted = true;
                 tx.send(Action::StatusMessage(
                     "Purchase successful, fetching download info...".into(),
                 ))
@@ -724,6 +726,7 @@ async fn acquire_download_item(
                 return Err("license not found after purchase".into());
             }
             Err(e) if e.is_token_expired() && attempt + 1 < max_attempts => {
+                last_error = Some(e.to_string());
                 tx.send(Action::StatusMessage(
                     "Token expired, re-authenticating...".into(),
                 ))
@@ -742,7 +745,10 @@ async fn acquire_download_item(
         }
     }
 
-    Err("failed to get download info after retries".into())
+    Err(last_error.map_or_else(
+        || "failed to get download info after retries".into(),
+        |e| format!("failed to get download info after retries: {e}"),
+    ))
 }
 
 async fn purchase_for_download(

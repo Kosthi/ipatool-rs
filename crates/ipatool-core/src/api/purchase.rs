@@ -54,6 +54,10 @@ async fn try_purchase(
         plist::Value::String("true".into()),
     );
     body.insert(
+        "hasDoneAgeCheck".into(),
+        plist::Value::String("true".into()),
+    );
+    body.insert(
         "buyWithoutAuthorization".into(),
         plist::Value::String("true".into()),
     );
@@ -92,7 +96,7 @@ async fn try_purchase(
     let resp = client
         .http()
         .post(&url)
-        .header("Content-Type", "application/x-www-form-urlencoded")
+        .header("Content-Type", "application/x-apple-plist")
         .header("iCloud-DSID", &account.directory_services_id)
         .header("X-Dsid", &account.directory_services_id)
         .header("X-Apple-Store-Front", &account.store_front)
