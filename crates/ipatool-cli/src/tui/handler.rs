@@ -160,10 +160,10 @@ fn handle_downloads_normal(app: &mut App_, key: KeyEvent) {
             app.download_list_state.select(Some(i));
         }
         KeyCode::Char('x') => {
-            if let Some(idx) = app.download_list_state.selected() {
-                if let Some(dl) = app.downloads.get(idx) {
-                    app.action_tx.send(Action::CancelDownload(dl.id)).ok();
-                }
+            if let Some(idx) = app.download_list_state.selected()
+                && let Some(dl) = app.downloads.get(idx)
+            {
+                app.action_tx.send(Action::CancelDownload(dl.id)).ok();
             }
         }
         KeyCode::Char('c') => {

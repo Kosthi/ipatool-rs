@@ -190,7 +190,8 @@ async fn process_action(app: &mut App_, action: Action) {
                 error: None,
                 cancel_token: cancel_token.clone(),
             });
-            app.download_list_state.select(Some(app.downloads.len() - 1));
+            app.download_list_state
+                .select(Some(app.downloads.len() - 1));
             app.status_message = format!("Queued {app_name} — see Downloads tab");
 
             let client = Arc::clone(&app.client);
@@ -207,7 +208,17 @@ async fn process_action(app: &mut App_, action: Action) {
                     tx.send(Action::DownloadCancelled(id)).ok();
                     return;
                 }
-                run_download_task(client, app_id, bundle_id, app_name, account, tx, id, cancel_token).await;
+                run_download_task(
+                    client,
+                    app_id,
+                    bundle_id,
+                    app_name,
+                    account,
+                    tx,
+                    id,
+                    cancel_token,
+                )
+                .await;
             });
         }
         Action::DownloadProgress {
@@ -240,13 +251,13 @@ async fn process_action(app: &mut App_, action: Action) {
             }
         }
         Action::CancelDownload(id) => {
-            if let Some(dl) = app.download_by_id(id) {
-                if !matches!(
+            if let Some(dl) = app.download_by_id(id)
+                && !matches!(
                     dl.stage,
                     DownloadStage::Complete | DownloadStage::Failed | DownloadStage::Cancelled
-                ) {
-                    dl.cancel_token.cancel();
-                }
+                )
+            {
+                dl.cancel_token.cancel();
             }
         }
         Action::DownloadCancelled(id) => {
@@ -517,7 +528,13 @@ fn render_status_bar(f: &mut ratatui::Frame, app: &App_, area: Rect) {
                 ("Tab", "next"),
             ],
             ActiveTab::Library => &[("q", "quit"), ("Tab", "next")],
-            ActiveTab::Downloads => &[("q", "quit"), ("j/k", "nav"), ("x", "cancel"), ("c", "clear"), ("Tab", "next")],
+            ActiveTab::Downloads => &[
+                ("q", "quit"),
+                ("j/k", "nav"),
+                ("x", "cancel"),
+                ("c", "clear"),
+                ("Tab", "next"),
+            ],
             ActiveTab::Account if app.account.is_some() => {
                 &[("q", "quit"), ("r", "revoke"), ("Tab", "next")]
             }
@@ -598,6 +615,7 @@ async fn tui_reauth(
     Ok(new_account)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_download_task(
     client: Arc<Mutex<AppleClient>>,
     app_id: i64,

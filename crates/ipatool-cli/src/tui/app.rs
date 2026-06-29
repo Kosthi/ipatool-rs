@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use ratatui::widgets::{ListState, TableState};
-use tokio::sync::{Mutex, Semaphore};
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{Mutex, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tui_input::Input;
 
@@ -190,11 +190,11 @@ impl App_ {
         });
         if self.downloads.is_empty() {
             self.download_list_state.select(None);
-        } else if let Some(sel) = self.download_list_state.selected() {
-            if sel >= self.downloads.len() {
-                self.download_list_state
-                    .select(Some(self.downloads.len() - 1));
-            }
+        } else if let Some(sel) = self.download_list_state.selected()
+            && sel >= self.downloads.len()
+        {
+            self.download_list_state
+                .select(Some(self.downloads.len() - 1));
         }
     }
 }

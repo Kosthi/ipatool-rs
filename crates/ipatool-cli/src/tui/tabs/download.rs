@@ -41,11 +41,7 @@ pub fn render(f: &mut Frame, app: &mut App_, area: Rect) {
                     let bar_width = 20usize.min(available_width / 3);
                     let filled = (ratio * bar_width as f64) as usize;
                     let empty = bar_width.saturating_sub(filled);
-                    let bar = format!(
-                        "{}{}",
-                        "█".repeat(filled),
-                        "░".repeat(empty),
-                    );
+                    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty),);
 
                     let line = Line::from(vec![
                         Span::styled(format!("  {}", dl.app_name), theme::value()),
@@ -73,10 +69,7 @@ pub fn render(f: &mut Frame, app: &mut App_, area: Rect) {
                     if let Some(ref err) = dl.error {
                         ListItem::new(vec![
                             header,
-                            Line::from(Span::styled(
-                                format!("  {err}"),
-                                theme::error_style(),
-                            )),
+                            Line::from(Span::styled(format!("  {err}"), theme::error_style())),
                         ])
                     } else {
                         ListItem::new(header)
