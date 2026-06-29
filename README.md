@@ -1,49 +1,74 @@
 # ipatool-rs
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg)](https://www.rust-lang.org/)
+<p align="center">
+  <img src="media/logo.svg" alt="ipatool-rs" width="620">
+</p>
 
-A working, open-source command-line tool to search, purchase, and download iOS App Store packages (IPA files).
+<p align="center">
+  A terminal UI and CLI for searching, purchasing, and downloading iOS App Store IPA files. Like ipatool, but rebuilt in Rust and adapted to Apple's current auth flow.
+</p>
 
-**Rewritten in Rust** from [majd/ipatool](https://github.com/majd/ipatool). As of June 2026, Apple has changed its authentication endpoints multiple times, breaking the original Go implementation and its many forks. **ipatool-rs is currently the only open-source ipatool that works out of the box.**
+<p align="center">
+  <a href="https://github.com/Kosthi/ipatool-rs/actions/workflows/ci.yml"><img src="https://github.com/Kosthi/ipatool-rs/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024_edition-orange.svg" alt="Rust 2024"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
-## Why a rewrite?
+<p align="center">
+  <a href="media/demo.svg"><img src="media/demo.svg" alt="ipatool-rs TUI demo" width="860"></a>
+</p>
 
-| | Go (original) | Rust (this project) |
-|---|---|---|
-| Auth | Broken (Apple endpoint changes) | Working (adapted to latest Apple auth flow) |
-| Error messages | "something went wrong" | Structured errors with clear failure reasons |
-| Type safety | Runtime plist field access | Compile-time typed models with serde |
-| Binary size | ~15 MB (with runtime) | ~7 MB static binary, no runtime |
-| Memory | GC pauses on large downloads | Zero-copy streaming, no GC |
+## Why This Exists
 
-## Requirements
+The original Go [ipatool](https://github.com/majd/ipatool) and many forks broke after Apple changed authentication endpoints.
+`ipatool-rs` keeps the same practical goal: log in with an Apple ID, search the App Store, obtain free licenses, and download IPA files.
 
-- macOS / Linux / Windows
-- An Apple ID with App Store access
+This rewrite adds a keyboard-driven terminal UI, structured Rust models, clearer errors, streaming downloads, and retry/reauth flows for unstable App Store responses.
+
+## Features
+
+- Interactive TUI mode: run `ipatool` to open tabs for Search, Library, Downloads, and Account.
+- Search-to-download workflow: browse App Store results, inspect app details, purchase free licenses, and queue downloads from one screen.
+- Download dashboard: track progress, failures, cancellation, and completed items in the Downloads tab.
+- Account management: log in, handle 2FA, view the active account, and revoke stored credentials.
+- Resilient sessions: refresh expired tokens during purchase and download flows when stored credentials are available.
+- Robust downloads: stream IPA files with progress display and HTTP Range resume support in CLI mode.
+- Patch-ready IPAs: inject purchase metadata and SINF authorization data into the downloaded archive.
+- Text or JSON output for scripts and automation.
 
 ## Installation
 
-### Build from source
+### Build From Source
 
 ```bash
 git clone https://github.com/Kosthi/ipatool-rs.git
 cd ipatool-rs
 cargo build --release
+
 # Binary at target/release/ipatool
 ```
 
 ## Usage
 
-### Auth
+### Terminal UI
 
-Log in with your Apple ID. Supports two-factor authentication.
+Launch the TUI by running `ipatool` without a subcommand.
+
+```bash
+ipatool
+```
+
+The UI is built with [ratatui](https://ratatui.rs/) and [crossterm](https://github.com/crossterm-rs/crossterm). It provides a fast keyboard workflow for login, search, purchase, download progress, and cancellation.
+
+### CLI
+
+Log in with your Apple ID. Two-factor authentication is supported.
 
 ```bash
 # Interactive login
 ipatool auth login --email your@apple.id --password 'password'
 
-# With 2FA code (run after first login prompts for 2FA)
+# With 2FA code
 ipatool auth login --email your@apple.id --password 'password' --auth-code 123456
 
 # Show current account
@@ -53,8 +78,6 @@ ipatool auth info
 ipatool auth revoke
 ```
 
-### Search
-
 Search for apps on the App Store.
 
 ```bash
@@ -62,17 +85,13 @@ ipatool search "WeChat" --limit 10
 ipatool search "Telegram" --limit 5 --country US
 ```
 
-### Purchase
-
-Obtain a free license for an app (required before downloading).
+Obtain a free license for an app.
 
 ```bash
 ipatool purchase -b com.tencent.xin
 ```
 
-### Download
-
-Download an IPA file. Use `--purchase` to automatically obtain the license.
+Download an IPA file. Use `--purchase` to automatically obtain the license before downloading.
 
 ```bash
 # Download with auto-purchase
@@ -88,8 +107,6 @@ ipatool download -i 414478124 --purchase
 ipatool download -b com.tencent.xin --version-id 12345
 ```
 
-### Version
-
 List available versions and retrieve version metadata.
 
 ```bash
@@ -102,45 +119,84 @@ ipatool version meta -b com.tencent.xin --version-id 12345
 
 ### Global Flags
 
-```
+```text
 --format <text|json>    Output format (default: text)
 --verbose               Enable debug logging
 --non-interactive       Disable interactive prompts
 ```
 
+## Keyboard Controls
+
+**Global**
+
+| Key | Action |
+|-----|--------|
+| `q` / `Ctrl+C` | Quit |
+| `Tab` / `Shift+Tab` | Switch tabs |
+| `1`-`4` | Jump to a tab |
+| `j/k` or `Up/Down` | Navigate the current list |
+| `Esc` | Cancel input or close a popup |
+
+**Search tab**
+
+| Key | Action |
+|-----|--------|
+| `/` / `s` | Focus the search input |
+| `Enter` | Run search |
+| `d` | Download selected app |
+| `p` | Purchase selected app |
+
+**Downloads tab**
+
+| Key | Action |
+|-----|--------|
+| `x` | Cancel selected download |
+| `c` | Clear finished downloads |
+
+**Account tab**
+
+| Key | Action |
+|-----|--------|
+| `l` | Log in |
+| `r` | Revoke stored credentials |
+
 ## Project Structure
 
-```
+```text
 ipatool-rs/
-├── Cargo.toml                  # Workspace root
-└── crates/
-    ├── ipatool-core/           # Core library (reusable)
-    │   └── src/
-    │       ├── api/            # Apple API endpoints (auth, search, purchase, download)
-    │       ├── client/         # HTTP client, plist parser, cookie jar
-    │       ├── model/          # Account, App, Platform, StoreFront types
-    │       ├── ipa/            # IPA patching (SINF + metadata injection)
-    │       ├── error.rs        # Three-layer error hierarchy
-    │       ├── credential.rs   # Keychain storage
-    │       └── guid.rs         # Device GUID generation
-    └── ipatool-cli/            # CLI binary
-        └── src/
-            ├── main.rs         # Entry point + clap arg parsing
-            ├── output.rs       # Text/JSON formatters
-            └── commands/       # Subcommand handlers
+|-- Cargo.toml                  # Workspace root
+|-- media/                      # README logo and demo assets
+`-- crates/
+    |-- ipatool-core/           # Core library
+    |   `-- src/
+    |       |-- api/            # Apple API endpoints
+    |       |-- client/         # HTTP client, plist parser, cookie jar
+    |       |-- model/          # Account, App, Platform, StoreFront types
+    |       |-- ipa/            # IPA patching
+    |       |-- error.rs        # Error hierarchy
+    |       |-- credential.rs   # Keychain storage
+    |       `-- guid.rs         # Device GUID generation
+    `-- ipatool-cli/            # CLI binary
+        `-- src/
+            |-- main.rs         # Entry point and clap parsing
+            |-- output.rs       # Text/JSON formatters
+            |-- tui/            # Interactive terminal UI
+            `-- commands/       # Subcommand handlers
 ```
 
-## How it works
+## How It Works
 
-1. **Auth** — Posts credentials to Apple's native auth endpoint (`auth.itunes.apple.com/auth/v1/native/fast/`) using the legacy MZFinance protocol. Handles 2FA, redirects, and retry logic. Stores the session token in the system keychain and cookies on disk.
+1. **Auth** - Posts credentials to Apple's native auth endpoint using the legacy MZFinance protocol. Handles 2FA, redirects, retry logic, keychain storage, and cookies.
 
-2. **Search/Lookup** — Queries the public iTunes Search API (`itunes.apple.com/search`).
+2. **Search/Lookup** - Queries the public iTunes Search API for app metadata and storefront-specific results.
 
-3. **Purchase** — Sends a buy request to `buy.itunes.apple.com` with STDQ pricing (falls back to GAME for Apple Arcade). Tolerates "license already exists".
+3. **Purchase** - Sends a buy request to `buy.itunes.apple.com` with STDQ pricing and falls back to GAME for Apple Arcade-style responses.
 
-4. **Download** — Fetches download URL and DRM data (SINF) from Apple's `volumeStoreDownloadProduct` endpoint. Streams the IPA with progress display and HTTP Range resume support.
+4. **Download** - Fetches the download URL and DRM data from Apple's `volumeStoreDownloadProduct` endpoint, then streams the IPA.
 
-5. **Patch** — Rebuilds the ZIP: injects `iTunesMetadata.plist` (purchase metadata + Apple ID) and SINF files (DRM authorization) into the IPA. Without this step, the IPA cannot be installed on a device.
+5. **Patch** - Rebuilds the ZIP, injecting `iTunesMetadata.plist` and SINF files so the IPA can be installed on an authorized device.
+
+6. **TUI** - Wraps the same core APIs in an async ratatui/crossterm interface with background tasks for search, login, purchase, and downloads.
 
 ## License
 

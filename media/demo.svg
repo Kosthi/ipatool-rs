@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" role="img" aria-labelledby="title desc">
+  <title id="title">ipatool-rs TUI demo</title>
+  <desc id="desc">Animated mock terminal showing search, downloads, and account tabs.</desc>
+  <style>
+    .bg { fill: #07111f; }
+    .panel { fill: #0d182a; stroke: #22324d; stroke-width: 1.5; }
+    .soft { fill: #111e31; stroke: #253a59; stroke-width: 1; }
+    .tab { fill: #111e31; }
+    .tab-active { fill: #58f3b3; }
+    .text { fill: #d8e7fb; font: 16px SFMono-Regular, Consolas, Liberation Mono, monospace; }
+    .muted { fill: #8fa3bd; font: 15px SFMono-Regular, Consolas, Liberation Mono, monospace; }
+    .small { fill: #8fa3bd; font: 13px SFMono-Regular, Consolas, Liberation Mono, monospace; }
+    .title { fill: #eef5ff; font: 700 18px SFMono-Regular, Consolas, Liberation Mono, monospace; }
+    .accent { fill: #58f3b3; }
+    .blue { fill: #46c7ff; }
+    .purple { fill: #8aa4ff; }
+    .warn { fill: #ffd166; }
+    .error { fill: #ff7a90; }
+    .frame { opacity: 0; }
+    .search-frame { animation: search 9s infinite; }
+    .downloads-frame { animation: downloads 9s infinite; }
+    .account-frame { animation: account 9s infinite; }
+    .cursor { animation: blink 0.9s steps(2, start) infinite; }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes search {
+      0%, 30% { opacity: 1; }
+      34%, 100% { opacity: 0; }
+    }
+    @keyframes downloads {
+      0%, 31% { opacity: 0; }
+      35%, 64% { opacity: 1; }
+      68%, 100% { opacity: 0; }
+    }
+    @keyframes account {
+      0%, 65% { opacity: 0; }
+      69%, 96% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes blink {
+      0%, 45% { opacity: 1; }
+      46%, 100% { opacity: 0; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.45; }
+      50% { opacity: 1; }
+    }
+  </style>
+
+  <rect x="0" y="0" width="980" height="560" rx="28" fill="#030812"/>
+  <rect x="24" y="24" width="932" height="512" rx="24" class="bg" stroke="#1d2e48" stroke-width="2"/>
+
+  <g transform="translate(46 45)">
+    <circle cx="10" cy="10" r="6" fill="#ff6b7d"/>
+    <circle cx="30" cy="10" r="6" fill="#ffd166"/>
+    <circle cx="50" cy="10" r="6" fill="#58f3b3"/>
+    <text x="78" y="16" class="small">ipatool-rs - terminal UI</text>
+  </g>
+
+  <rect x="46" y="78" width="888" height="38" rx="10" class="soft"/>
+  <g class="search-frame frame">
+    <rect x="62" y="88" width="86" height="18" rx="9" class="tab-active"/>
+    <text x="80" y="102" fill="#07111f" font-size="13" font-family="SFMono-Regular,Consolas,Liberation Mono,monospace" font-weight="700">Search</text>
+    <text x="173" y="102" class="small">Library</text>
+    <text x="263" y="102" class="small">Downloads</text>
+    <text x="380" y="102" class="small">Account</text>
+  </g>
+  <g class="downloads-frame frame">
+    <text x="80" y="102" class="small">Search</text>
+    <text x="173" y="102" class="small">Library</text>
+    <rect x="246" y="88" width="112" height="18" rx="9" class="tab-active"/>
+    <text x="264" y="102" fill="#07111f" font-size="13" font-family="SFMono-Regular,Consolas,Liberation Mono,monospace" font-weight="700">Downloads</text>
+    <text x="380" y="102" class="small">Account</text>
+  </g>
+  <g class="account-frame frame">
+    <text x="80" y="102" class="small">Search</text>
+    <text x="173" y="102" class="small">Library</text>
+    <text x="263" y="102" class="small">Downloads</text>
+    <rect x="364" y="88" width="96" height="18" rx="9" class="tab-active"/>
+    <text x="382" y="102" fill="#07111f" font-size="13" font-family="SFMono-Regular,Consolas,Liberation Mono,monospace" font-weight="700">Account</text>
+  </g>
+  <text x="822" y="102" class="small">[US] signed in</text>
+
+  <g class="search-frame frame">
+    <rect x="46" y="132" width="528" height="330" rx="14" class="panel"/>
+    <rect x="594" y="132" width="340" height="330" rx="14" class="panel"/>
+    <text x="70" y="164" class="title">Search App Store</text>
+    <rect x="70" y="183" width="474" height="34" rx="9" fill="#07111f" stroke="#2b4264"/>
+    <text x="90" y="206" class="text">wechat</text>
+    <rect x="154" y="193" width="9" height="18" rx="2" class="accent cursor"/>
+
+    <text x="74" y="250" class="small">Name</text>
+    <text x="306" y="250" class="small">Bundle</text>
+    <text x="478" y="250" class="small">Price</text>
+    <rect x="62" y="265" width="494" height="44" rx="10" fill="#173153" stroke="#46c7ff"/>
+    <text x="78" y="292" class="text">WeChat</text>
+    <text x="306" y="292" class="muted">com.tencent.xin</text>
+    <text x="490" y="292" class="accent">Free</text>
+    <rect x="62" y="316" width="494" height="38" rx="8" fill="#0b1525"/>
+    <text x="78" y="340" class="text">Telegram Messenger</text>
+    <text x="306" y="340" class="muted">ph.telegra.Telegraph</text>
+    <text x="490" y="340" class="accent">Free</text>
+    <rect x="62" y="362" width="494" height="38" rx="8" fill="#0b1525"/>
+    <text x="78" y="386" class="text">QQ</text>
+    <text x="306" y="386" class="muted">com.tencent.mqq</text>
+    <text x="490" y="386" class="accent">Free</text>
+
+    <text x="620" y="164" class="title">WeChat</text>
+    <text x="620" y="196" class="muted">Bundle</text>
+    <text x="725" y="196" class="text">com.tencent.xin</text>
+    <text x="620" y="228" class="muted">App ID</text>
+    <text x="725" y="228" class="text">414478124</text>
+    <text x="620" y="260" class="muted">Version</text>
+    <text x="725" y="260" class="text">8.0.x</text>
+    <text x="620" y="292" class="muted">Workflow</text>
+    <text x="725" y="292" class="accent">d download</text>
+    <text x="725" y="322" class="blue">p purchase</text>
+  </g>
+
+  <g class="downloads-frame frame">
+    <rect x="46" y="132" width="888" height="330" rx="14" class="panel"/>
+    <text x="70" y="164" class="title">Downloads</text>
+    <text x="70" y="194" class="muted">Queued and active IPA downloads</text>
+
+    <rect x="70" y="222" width="820" height="72" rx="12" fill="#0b1525" stroke="#2b4264"/>
+    <text x="94" y="252" class="text">WeChat</text>
+    <text x="270" y="252" class="small">Downloading</text>
+    <rect x="94" y="267" width="520" height="10" rx="5" fill="#1c2d47"/>
+    <rect x="94" y="267" height="10" rx="5" class="accent">
+      <animate attributeName="width" values="90;230;410;520" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <text x="640" y="276" class="small">28.4 MB / 43.0 MB</text>
+
+    <rect x="70" y="314" width="820" height="72" rx="12" fill="#0b1525" stroke="#2b4264"/>
+    <text x="94" y="344" class="text">Telegram Messenger</text>
+    <text x="270" y="344" class="warn">Patching</text>
+    <rect x="94" y="359" width="520" height="10" rx="5" fill="#1c2d47"/>
+    <rect x="94" y="359" width="470" height="10" rx="5" fill="#ffd166"/>
+    <text x="640" y="368" class="small">injecting metadata</text>
+
+    <rect x="70" y="407" width="820" height="38" rx="10" fill="#102842"/>
+    <text x="94" y="432" class="accent">Download complete: com.tencent.xin_414478124_8.0.x.ipa</text>
+  </g>
+
+  <g class="account-frame frame">
+    <rect x="46" y="132" width="430" height="330" rx="14" class="panel"/>
+    <rect x="504" y="132" width="430" height="330" rx="14" class="panel"/>
+    <text x="70" y="164" class="title">Account</text>
+    <text x="70" y="202" class="muted">Name</text>
+    <text x="180" y="202" class="text">Koschei</text>
+    <text x="70" y="236" class="muted">Email</text>
+    <text x="180" y="236" class="text">your@apple.id</text>
+    <text x="70" y="270" class="muted">Storefront</text>
+    <text x="180" y="270" class="accent">US</text>
+    <text x="70" y="316" class="blue">r revoke credentials</text>
+
+    <text x="528" y="164" class="title">Session</text>
+    <rect x="528" y="190" width="360" height="48" rx="12" fill="#0b1525" stroke="#2b4264"/>
+    <circle cx="552" cy="214" r="7" class="accent pulse"/>
+    <text x="574" y="220" class="text">Authenticated</text>
+    <rect x="528" y="258" width="360" height="48" rx="12" fill="#0b1525" stroke="#2b4264"/>
+    <circle cx="552" cy="282" r="7" class="blue pulse"/>
+    <text x="574" y="288" class="text">Token refresh ready</text>
+    <rect x="528" y="326" width="360" height="48" rx="12" fill="#0b1525" stroke="#2b4264"/>
+    <circle cx="552" cy="350" r="7" class="warn pulse"/>
+    <text x="574" y="356" class="text">2FA supported</text>
+  </g>
+
+  <rect x="46" y="478" width="888" height="34" rx="10" fill="#101c2d" stroke="#22324d"/>
+  <g class="search-frame frame">
+    <text x="68" y="500" class="small"> / search   j/k nav   d download   p purchase   Tab next   q quit</text>
+  </g>
+  <g class="downloads-frame frame">
+    <text x="68" y="500" class="small"> j/k nav   x cancel   c clear finished   Tab next   q quit</text>
+  </g>
+  <g class="account-frame frame">
+    <text x="68" y="500" class="small"> l login   r revoke   Tab next   q quit</text>
+  </g>
+</svg>
