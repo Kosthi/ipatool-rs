@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 use url::Url;
 
 use crate::client::AppleClient;
@@ -6,6 +7,8 @@ use crate::error::{ClientError, StoreError};
 use crate::model::Account;
 
 const MAX_ATTEMPTS: u32 = 4;
+const MAX_REDIRECTS: u32 = 5;
+const AUTH_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn login(
     client: &AppleClient,
@@ -20,6 +23,7 @@ pub async fn login(
     };
 
     let mut attempt = 1u32;
+    let mut redirects = 0u32;
     let mut current_url = auth_url.clone();
 
     loop {
@@ -34,6 +38,7 @@ pub async fn login(
             .http()
             .post(current_url.as_str())
             .header("Content-Type", "application/x-apple-plist")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .body(body_bytes)
             .send()
             .await?;
@@ -44,6 +49,13 @@ pub async fn login(
         if status == reqwest::StatusCode::FOUND
             && let Some(location) = resp.headers().get("location")
         {
+            redirects += 1;
+            if redirects > MAX_REDIRECTS {
+                return Err(ClientError::UnexpectedResponse(
+                    "too many auth redirects".into(),
+                ));
+            }
+
             let new_url = location
                 .to_str()
                 .map_err(|_| ClientError::MissingHeader("location (invalid)".into()))?;

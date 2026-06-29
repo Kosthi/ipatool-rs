@@ -93,7 +93,7 @@ The UI is built with [ratatui](https://ratatui.rs/) and [crossterm](https://gith
 Log in with your Apple ID. Two-factor authentication is supported.
 
 ```bash
-# Interactive login
+# Interactive login (prompts for a 2FA code if Apple requires one)
 ipatool auth login --email your@apple.id --password 'password'
 
 # With 2FA code

@@ -45,33 +45,19 @@ fn render_login_form(f: &mut Frame, app: &App_, area: Rect) {
     let email_active = app.input_mode == InputMode::LoginEmail;
     let pass_active = app.input_mode == InputMode::LoginPassword;
     let auth_code_active = app.input_mode == InputMode::LoginAuthCode;
-    let show_auth_code = app.login_needs_auth_code || auth_code_active;
 
-    let chunks = if show_auth_code {
-        Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Min(1),
-        ])
-        .split(area)
-    } else {
-        Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Min(1),
-        ])
-        .split(area)
-    };
+    let chunks = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(2),
+        Constraint::Length(1),
+        Constraint::Length(2),
+        Constraint::Length(1),
+        Constraint::Length(2),
+        Constraint::Length(1),
+        Constraint::Min(1),
+    ])
+    .split(area);
 
     f.render_widget(
         Paragraph::new(Span::styled("  Login", theme::title())),
@@ -152,51 +138,43 @@ fn render_login_form(f: &mut Frame, app: &App_, area: Rect) {
         f.set_cursor_position((cx, cy));
     }
 
-    let help_chunk;
-    let footer_chunk;
-
-    if show_auth_code {
-        let auth_code_label_style = if auth_code_active {
-            theme::border_active()
-        } else {
-            theme::label()
-        };
-        f.render_widget(
-            Paragraph::new(Span::styled("  Two-factor code", auth_code_label_style)),
-            chunks[5],
-        );
-
-        let auth_code_text = if app.login_auth_code.value().is_empty() && !auth_code_active {
-            Line::from(Span::styled("  123456", theme::input_placeholder()))
-        } else {
-            Line::from(Span::styled(
-                format!("  {}", app.login_auth_code.value()),
-                theme::input_active(),
-            ))
-        };
-        let auth_code_border = if auth_code_active {
-            theme::border_active()
-        } else {
-            theme::border_dim()
-        };
-        let auth_code = Paragraph::new(auth_code_text).block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(auth_code_border),
-        );
-        f.render_widget(auth_code, chunks[6]);
-
-        if auth_code_active {
-            let cx = chunks[6].x + app.login_auth_code.visual_cursor() as u16 + 3;
-            let cy = chunks[6].y;
-            f.set_cursor_position((cx, cy));
-        }
-
-        help_chunk = chunks[7];
-        footer_chunk = chunks[8];
+    let auth_code_label_style = if auth_code_active {
+        theme::border_active()
     } else {
-        help_chunk = chunks[5];
-        footer_chunk = chunks[6];
+        theme::label()
+    };
+    f.render_widget(
+        Paragraph::new(Span::styled(
+            "  Two-factor code (optional)",
+            auth_code_label_style,
+        )),
+        chunks[5],
+    );
+
+    let auth_code_text = if app.login_auth_code.value().is_empty() && !auth_code_active {
+        Line::from(Span::styled("  123456", theme::input_placeholder()))
+    } else {
+        Line::from(Span::styled(
+            format!("  {}", app.login_auth_code.value()),
+            theme::input_active(),
+        ))
+    };
+    let auth_code_border = if auth_code_active {
+        theme::border_active()
+    } else {
+        theme::border_dim()
+    };
+    let auth_code = Paragraph::new(auth_code_text).block(
+        Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(auth_code_border),
+    );
+    f.render_widget(auth_code, chunks[6]);
+
+    if auth_code_active {
+        let cx = chunks[6].x + app.login_auth_code.visual_cursor() as u16 + 3;
+        let cy = chunks[6].y;
+        f.set_cursor_position((cx, cy));
     }
 
     let help = if let Some(ref err) = app.login_error {
@@ -216,7 +194,7 @@ fn render_login_form(f: &mut Frame, app: &App_, area: Rect) {
         ]
     };
 
-    f.render_widget(Paragraph::new(help), help_chunk);
+    f.render_widget(Paragraph::new(help), chunks[7]);
 
     f.render_widget(
         Paragraph::new(vec![
@@ -226,7 +204,7 @@ fn render_login_form(f: &mut Frame, app: &App_, area: Rect) {
                 theme::label(),
             )),
         ]),
-        footer_chunk,
+        chunks[8],
     );
 }
 

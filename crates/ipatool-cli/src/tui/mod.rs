@@ -278,17 +278,17 @@ async fn process_action(app: &mut App_, action: Action) {
                 return;
             }
 
-            let auth_code = if app.login_needs_auth_code {
+            let auth_code = {
                 let code = app.login_auth_code.value().trim().to_string();
-                if code.is_empty() {
-                    app.input_mode = InputMode::LoginAuthCode;
-                    app.login_error = Some("Two-factor authentication code required".to_string());
-                    return;
-                }
-                Some(code)
-            } else {
-                None
+                if code.is_empty() { None } else { Some(code) }
             };
+
+            let auth_code_hint = if auth_code.is_some() {
+                "login rejected; check your password and 2FA code"
+            } else {
+                "login rejected; check your password, or enter a 2FA code if Apple requested one"
+            }
+            .to_string();
 
             app.status_message = "Logging in...".to_string();
             app.login_error = None;
@@ -344,20 +344,13 @@ async fn process_action(app: &mut App_, action: Action) {
                             )
                         ) =>
                     {
-                        tx.send(Action::LoginNeedsAuthCode).ok();
+                        tx.send(Action::LoginError(auth_code_hint)).ok();
                     }
                     Err(e) => {
                         tx.send(Action::LoginError(e.to_string())).ok();
                     }
                 }
             });
-        }
-        Action::LoginNeedsAuthCode => {
-            app.login_needs_auth_code = true;
-            app.login_auth_code = tui_input::Input::default();
-            app.input_mode = InputMode::LoginAuthCode;
-            app.login_error = Some("Two-factor authentication code required".to_string());
-            app.status_message = "Enter two-factor authentication code".to_string();
         }
         Action::LoginSuccess(account) => {
             if let Some(country) =
@@ -368,11 +361,12 @@ async fn process_action(app: &mut App_, action: Action) {
             app.account = Some(account);
             app.login_password.clear();
             app.login_auth_code = tui_input::Input::default();
-            app.login_needs_auth_code = false;
             app.status_message = "Logged in successfully".to_string();
         }
         Action::LoginError(err) => {
-            if app.login_needs_auth_code {
+            if app.login_auth_code.value().trim().is_empty() {
+                app.input_mode = InputMode::LoginPassword;
+            } else {
                 app.input_mode = InputMode::LoginAuthCode;
             }
             app.login_error = Some(err.clone());
@@ -387,7 +381,6 @@ async fn process_action(app: &mut App_, action: Action) {
             } else {
                 app.account = None;
                 app.login_auth_code = tui_input::Input::default();
-                app.login_needs_auth_code = false;
                 app.status_message = "Logged out".to_string();
             }
         }
