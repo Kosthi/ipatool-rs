@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-29
+
+### Fixed
+
+- Fixed `version list` requests for Apple's current response shape, including parsing version IDs from `songList` metadata and exposing the latest external version ID.
+- Improved `version list` text output by removing placeholder `version: ?` labels and marking the latest external version.
+- Added clearer guidance when version commands require purchasing the app first.
+
+## [0.1.1] - 2026-06-29
+
 ### Changed
 
 - Migrated release packaging to `cargo-dist`, producing Homebrew, shell, and PowerShell installers plus platform archives and checksums.

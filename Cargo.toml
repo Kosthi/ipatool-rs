@@ -4,7 +4,7 @@ members = ["crates/ipatool-core", "crates/ipatool-cli"]
 
 [workspace.package]
 edition = "2024"
-version = "0.1.1"
+version = "0.1.2"
 license = "MIT"
 description = "A terminal UI and CLI for searching, purchasing, and downloading iOS App Store IPA files."
 repository = "https://github.com/Kosthi/ipatool-rs"
