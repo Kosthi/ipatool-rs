@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-30
+
+### Fixed
+
+- Read `version meta` values from the selected IPA's main `Info.plist` instead of stale App Store download metadata.
+- Added targeted remote ZIP range reading for `Info.plist` so version metadata can be inspected without downloading the full IPA.
+- Re-authenticate and retry `version list` and `version meta` when stored password tokens expire.
+
 ## [0.1.2] - 2026-06-29
 
 ### Fixed
