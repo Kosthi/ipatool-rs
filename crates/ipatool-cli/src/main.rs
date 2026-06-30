@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let filter = if cli.verbose {
-        EnvFilter::new("debug")
+        EnvFilter::new("warn,ipatool=debug,ipatool_core=debug")
     } else {
         EnvFilter::from_default_env()
     };
@@ -126,7 +126,7 @@ async fn main() -> Result<()> {
     let guid_str = guid::generate_guid().context("failed to generate GUID")?;
 
     let data_dir = data_dir();
-    std::fs::create_dir_all(&data_dir).ok();
+    prepare_data_dir(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
     let mut client = ipatool_core::client::AppleClient::new(guid_str, Some(&cookie_path))
@@ -231,6 +231,19 @@ async fn main() -> Result<()> {
 pub(crate) fn data_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     std::path::PathBuf::from(home).join(".ipatool")
+}
+
+pub(crate) fn prepare_data_dir(path: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(path)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+
+    Ok(())
 }
 
 fn load_account() -> Result<ipatool_core::model::Account> {

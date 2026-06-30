@@ -28,6 +28,15 @@ pub fn new_cookie_store(path: Option<&Path>) -> Result<Arc<CookieStoreMutex>, Cl
 pub fn save_cookie_store(store: &CookieStoreMutex, path: &Path) -> Result<(), ClientError> {
     let mut file = std::fs::File::create(path)
         .map_err(|e| ClientError::UnexpectedResponse(format!("cookie file create: {e}")))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| ClientError::UnexpectedResponse(format!("cookie permissions: {e}")))?;
+    }
+
     let guard = store.lock().unwrap();
     #[allow(deprecated)]
     guard

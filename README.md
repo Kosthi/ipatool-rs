@@ -29,7 +29,7 @@ This rewrite adds a keyboard-driven terminal UI, structured Rust models, clearer
 - Search-to-download workflow: browse App Store results, inspect app details, purchase free licenses, and queue downloads from one screen.
 - Download dashboard: track progress, failures, cancellation, and completed items in the Downloads tab.
 - Account management: log in, handle 2FA, view the active account, and revoke stored credentials.
-- Resilient sessions: refresh expired tokens during purchase and download flows when stored credentials are available.
+- Resilient sessions: refresh expired tokens during long-running interactive sessions when the password is still in memory.
 - Robust downloads: stream IPA files with progress display and HTTP Range resume support in CLI mode.
 - Patch-ready IPAs: inject purchase metadata and SINF authorization data into the downloaded archive.
 - Text or JSON output for scripts and automation.
@@ -93,11 +93,11 @@ The UI is built with [ratatui](https://ratatui.rs/) and [crossterm](https://gith
 Log in with your Apple ID. Two-factor authentication is supported.
 
 ```bash
-# Interactive login (prompts for a 2FA code if Apple requires one)
-ipatool auth login --email your@apple.id --password 'password'
+# Interactive login (prompts for the password and 2FA code if Apple requires one)
+ipatool auth login --email your@apple.id
 
-# With 2FA code
-ipatool auth login --email your@apple.id --password 'password' --auth-code 123456
+# Non-interactive mode still supports --password and --auth-code for controlled automation,
+# but those values can be visible in shell history and process lists.
 
 # Show current account
 ipatool auth info
@@ -216,7 +216,7 @@ ipatool-rs/
 
 ## How It Works
 
-1. **Auth** - Posts credentials to Apple's native auth endpoint using the legacy MZFinance protocol. Handles 2FA, redirects, retry logic, keychain storage, and cookies.
+1. **Auth** - Posts credentials to Apple's native auth endpoint using the legacy MZFinance protocol. Handles 2FA, redirects, retry logic, keychain storage for account tokens, and cookies. The raw Apple ID password is not persisted.
 
 2. **Search/Lookup** - Queries the public iTunes Search API for app metadata and storefront-specific results.
 

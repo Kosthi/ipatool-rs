@@ -120,11 +120,7 @@ async fn try_get_download_info(
     tracing::debug!(%status, "download response status");
 
     let resp_body = resp.bytes().await?;
-    tracing::debug!(
-        len = resp_body.len(),
-        preview = %String::from_utf8_lossy(&resp_body[..resp_body.len().min(500)]),
-        "download response body"
-    );
+    tracing::debug!(len = resp_body.len(), "download response body received");
     let dict: HashMap<String, plist::Value> =
         crate::client::plist_xml::parse_plist_response(&resp_body)?;
 

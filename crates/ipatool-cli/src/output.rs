@@ -36,6 +36,16 @@ pub fn print_apps(apps: &[ipatool_core::model::App], format: OutputFormat) {
     }
 }
 
+#[derive(Serialize)]
+struct AccountOutput<'a> {
+    name: &'a str,
+    email: &'a str,
+    directory_services_id: &'a str,
+    store_front: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pod: Option<&'a str>,
+}
+
 pub fn print_account(account: &ipatool_core::model::Account, format: OutputFormat) {
     match format {
         OutputFormat::Text => {
@@ -47,6 +57,12 @@ pub fn print_account(account: &ipatool_core::model::Account, format: OutputForma
                 println!("Pod:      {pod}");
             }
         }
-        OutputFormat::Json => print_json(account),
+        OutputFormat::Json => print_json(&AccountOutput {
+            name: &account.name,
+            email: &account.email,
+            directory_services_id: &account.directory_services_id,
+            store_front: &account.store_front,
+            pod: account.pod.as_deref(),
+        }),
     }
 }

@@ -30,7 +30,7 @@ use tokio_util::sync::CancellationToken;
 use futures_util::StreamExt;
 use tokio::io::AsyncWriteExt;
 
-use crate::data_dir;
+use crate::{data_dir, prepare_data_dir};
 
 use self::action::Action;
 use self::app::{ActiveTab, App_, DownloadStage, InputMode};
@@ -39,7 +39,7 @@ use self::event::{Event, EventHandler};
 pub async fn run() -> Result<()> {
     let guid_str = ipatool_core::guid::generate_guid().context("failed to generate GUID")?;
     let data_dir = data_dir();
-    std::fs::create_dir_all(&data_dir).ok();
+    prepare_data_dir(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
     let client =
