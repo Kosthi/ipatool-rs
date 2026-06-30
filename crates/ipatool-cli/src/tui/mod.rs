@@ -795,7 +795,35 @@ async fn stream_download(
         c.http().clone()
     };
 
-    let resp = http.get(url).send().await.map_err(|e| e.to_string())?;
+    let resp = http
+        .get(url)
+        .header("Accept-Encoding", "identity")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("<missing>")
+        .to_string();
+    let content_length = resp
+        .content_length()
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| "<missing>".into());
+    let looks_like_error = {
+        let content_type = content_type.to_ascii_lowercase();
+        content_type.starts_with("text/")
+            || content_type.contains("html")
+            || content_type.contains("json")
+    };
+
+    if !status.is_success() || looks_like_error {
+        return Err(format!(
+            "download: HTTP {status}, content-type {content_type}, content-length {content_length}"
+        ));
+    }
     let total_size = resp.content_length().unwrap_or(0);
 
     tx.send(Action::DownloadProgress {
@@ -817,9 +845,9 @@ async fn stream_download(
 
     loop {
         tokio::select! {
-            chunk = stream.next() => {
+            chunk = tokio::time::timeout(std::time::Duration::from_secs(60), stream.next()) => {
                 match chunk {
-                    Some(Ok(bytes)) => {
+                    Ok(Some(Ok(bytes))) => {
                         file.write_all(&bytes).await.map_err(|_| "write error".to_string())?;
                         downloaded += bytes.len() as u64;
                         let now = tokio::time::Instant::now();
@@ -834,8 +862,9 @@ async fn stream_download(
                             .ok();
                         }
                     }
-                    Some(Err(e)) => return Err(e.to_string()),
-                    None => break,
+                    Ok(Some(Err(e))) => return Err(e.to_string()),
+                    Ok(None) => break,
+                    Err(_) => return Err("download stalled for 60 seconds".to_string()),
                 }
             }
             _ = cancel_token.cancelled() => {

@@ -65,6 +65,8 @@ enum Commands {
         purchase: bool,
         #[arg(long, default_value = "iphone")]
         platform: Platform,
+        #[arg(long, default_value = "4")]
+        connections: usize,
     },
     Version {
         #[command(subcommand)]
@@ -172,6 +174,7 @@ async fn main() -> Result<()> {
             output,
             purchase,
             platform,
+            connections,
         } => {
             let account = load_account()?;
             client.set_account(account.clone());
@@ -183,6 +186,7 @@ async fn main() -> Result<()> {
                 output,
                 purchase,
                 platform,
+                connections,
                 &account,
             )
             .await?

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop persisting the raw Apple ID password in stored credentials and redact it from account JSON output.
 - Limit verbose logging to `ipatool` crates and remove App Store response body previews from debug logs.
 - Create the `~/.ipatool` data directory and cookie file with private permissions on Unix platforms.
+- Validate IPA download HTTP responses, fail stalled downloads, and add ranged parallel CLI downloads with `--connections`.
 
 ## [0.1.3] - 2026-06-30
 

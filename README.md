@@ -127,6 +127,9 @@ Use `-o` to choose a different output path.
 # Download with auto-purchase
 ipatool download -b com.tencent.xin --purchase
 
+# Use fewer or more ranged connections if a CDN path is slow or flaky
+ipatool download -b com.tencent.xin --purchase --connections 4
+
 # Specify output path
 ipatool download -b com.tencent.xin --purchase -o ~/Downloads/wechat.ipa
 

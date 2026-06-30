@@ -22,6 +22,7 @@ pub async fn download(
     output: Option<PathBuf>,
     do_purchase: bool,
     platform: Platform,
+    connections: usize,
     account: &Account,
 ) -> Result<()> {
     let mut account = account.clone();
@@ -100,7 +101,7 @@ pub async fn download(
     let tmp_path = dest.with_extension("ipa.tmp");
 
     eprintln!("Downloading to {}", tmp_path.display());
-    api::download::download_file(client, &item.url, &tmp_path, true)
+    api::download::download_file_with_connections(client, &item.url, &tmp_path, true, connections)
         .await
         .context("download failed")?;
 
