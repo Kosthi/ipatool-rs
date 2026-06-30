@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
+use time::format_description::well_known::Rfc3339;
 
 use crate::client::AppleClient;
 use crate::error::{ClientError, StoreError};
@@ -188,30 +189,13 @@ pub async fn get_version_metadata(
         crate::api::download::get_download_info(client, app_id, account, Some(external_version_id))
             .await?;
 
-    let bundle_short_version = item
-        .metadata
-        .get("bundleShortVersionString")
-        .and_then(|v| v.as_string())
-        .map(String::from);
+    let info = crate::ipa::partial_zip::read_remote_info_plist(client.http(), &item.url)
+        .await
+        .map_err(|e| {
+            ClientError::UnexpectedResponse(format!("failed to read version metadata: {e}"))
+        })?;
 
-    let bundle_version = item
-        .metadata
-        .get("bundleVersion")
-        .and_then(|v| v.as_string())
-        .map(String::from);
-
-    let release_date = item
-        .metadata
-        .get("releaseDate")
-        .and_then(|v| v.as_string())
-        .map(String::from);
-
-    Ok(VersionMetadata {
-        bundle_short_version,
-        bundle_version,
-        release_date,
-        extra: item.metadata,
-    })
+    version_metadata_from_info_plist(&info.plist, info.modified, item.metadata)
 }
 
 fn download_url(account: &Account, guid: &str) -> String {
@@ -220,6 +204,138 @@ fn download_url(account: &Account, guid: &str) -> String {
         None => "buy.itunes.apple.com".to_string(),
     };
     format!("https://{host}/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid={guid}")
+}
+
+fn version_metadata_from_info_plist(
+    info: &plist::Dictionary,
+    modified: Option<zip::DateTime>,
+    extra: HashMap<String, plist::Value>,
+) -> Result<VersionMetadata, ClientError> {
+    let bundle_short_version = first_metadata_string(
+        info,
+        &["CFBundleShortVersionString", "bundleShortVersionString"],
+    );
+    let bundle_version = first_metadata_string(info, &["CFBundleVersion", "bundleVersion"]);
+    let release_date = release_date_from_info_plist(info, modified)?;
+
+    Ok(VersionMetadata {
+        bundle_short_version,
+        bundle_version,
+        release_date,
+        extra,
+    })
+}
+
+fn first_metadata_string(info: &plist::Dictionary, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| info.get(key).and_then(metadata_value_to_string))
+}
+
+fn metadata_value_to_string(value: &plist::Value) -> Option<String> {
+    let value = match value {
+        plist::Value::String(s) => s.trim().to_string(),
+        plist::Value::Integer(i) => i
+            .as_signed()
+            .map(|n| n.to_string())
+            .or_else(|| i.as_unsigned().map(|n| n.to_string()))?,
+        plist::Value::Real(n) => n.to_string(),
+        _ => return None,
+    };
+
+    if value.is_empty() { None } else { Some(value) }
+}
+
+fn release_date_from_info_plist(
+    info: &plist::Dictionary,
+    modified: Option<zip::DateTime>,
+) -> Result<Option<String>, ClientError> {
+    for key in ["releaseDate", "ReleaseDate"] {
+        if let Some(value) = info.get(key) {
+            return parse_release_date_value(value).map(Some);
+        }
+    }
+
+    Ok(modified.map(zip_datetime_to_rfc3339))
+}
+
+fn parse_release_date_value(value: &plist::Value) -> Result<String, ClientError> {
+    match value {
+        plist::Value::Date(date) => Ok(date.to_xml_format()),
+        plist::Value::String(s) => parse_release_date_string(s),
+        plist::Value::Integer(i) => {
+            let timestamp = i.as_signed().or_else(|| {
+                i.as_unsigned()
+                    .and_then(|n| (n <= i64::MAX as u64).then_some(n as i64))
+            });
+            let timestamp = timestamp.ok_or_else(|| {
+                ClientError::UnexpectedResponse("release date timestamp is too large".into())
+            })?;
+            unix_timestamp_to_rfc3339(timestamp)
+        }
+        plist::Value::Real(n) if n.is_finite() => unix_timestamp_to_rfc3339(*n as i64),
+        plist::Value::Real(_) => Err(ClientError::UnexpectedResponse(
+            "release date timestamp is not finite".into(),
+        )),
+        _ => Err(ClientError::UnexpectedResponse(format!(
+            "unsupported release date type: {value:?}"
+        ))),
+    }
+}
+
+fn parse_release_date_string(value: &str) -> Result<String, ClientError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(ClientError::UnexpectedResponse(
+            "release date is empty".into(),
+        ));
+    }
+
+    if let Ok(parsed) = time::OffsetDateTime::parse(value, &Rfc3339) {
+        return format_datetime(parsed);
+    }
+
+    if is_date_only(value) {
+        return Ok(format!("{value}T00:00:00Z"));
+    }
+
+    Err(ClientError::UnexpectedResponse(format!(
+        "invalid release date: {value}"
+    )))
+}
+
+fn is_date_only(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[..4].iter().all(u8::is_ascii_digit)
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[8..].iter().all(u8::is_ascii_digit)
+}
+
+fn unix_timestamp_to_rfc3339(timestamp: i64) -> Result<String, ClientError> {
+    let datetime = time::OffsetDateTime::from_unix_timestamp(timestamp)
+        .map_err(|e| ClientError::UnexpectedResponse(format!("invalid release date: {e}")))?;
+    format_datetime(datetime)
+}
+
+fn format_datetime(datetime: time::OffsetDateTime) -> Result<String, ClientError> {
+    datetime
+        .to_offset(time::UtcOffset::UTC)
+        .format(&Rfc3339)
+        .map_err(|e| ClientError::UnexpectedResponse(format!("format release date: {e}")))
+}
+
+fn zip_datetime_to_rfc3339(datetime: zip::DateTime) -> String {
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        datetime.year(),
+        datetime.month(),
+        datetime.day(),
+        datetime.hour(),
+        datetime.minute(),
+        datetime.second()
+    )
 }
 
 #[cfg(test)]
@@ -236,6 +352,75 @@ mod tests {
         let mut dict = HashMap::new();
         dict.insert("songList".into(), song_list);
         dict
+    }
+
+    fn stale_download_metadata() -> HashMap<String, plist::Value> {
+        HashMap::from([
+            (
+                "bundleShortVersionString".into(),
+                plist::Value::String("1.0".into()),
+            ),
+            ("bundleVersion".into(), plist::Value::String("100".into())),
+            (
+                "releaseDate".into(),
+                plist::Value::String("2010-04-01T20:36:57Z".into()),
+            ),
+        ])
+    }
+
+    #[test]
+    fn version_metadata_uses_info_plist_values_not_download_metadata() {
+        let mut info = plist::Dictionary::new();
+        info.insert(
+            "CFBundleShortVersionString".into(),
+            plist::Value::String("2.0".into()),
+        );
+        info.insert("CFBundleVersion".into(), plist::Value::String("200".into()));
+        info.insert(
+            "releaseDate".into(),
+            plist::Value::String("2024-04-02T12:00:00Z".into()),
+        );
+
+        let out = version_metadata_from_info_plist(&info, None, stale_download_metadata()).unwrap();
+
+        assert_eq!(out.bundle_short_version.as_deref(), Some("2.0"));
+        assert_eq!(out.bundle_version.as_deref(), Some("200"));
+        assert_eq!(out.release_date.as_deref(), Some("2024-04-02T12:00:00Z"));
+        assert_eq!(
+            out.extra.get("releaseDate").and_then(|v| v.as_string()),
+            Some("2010-04-01T20:36:57Z")
+        );
+    }
+
+    #[test]
+    fn version_metadata_falls_back_to_info_plist_zip_time() {
+        let mut info = plist::Dictionary::new();
+        info.insert(
+            "CFBundleShortVersionString".into(),
+            plist::Value::String("2.0".into()),
+        );
+        let modified = zip::DateTime::from_date_and_time(2024, 3, 19, 12, 0, 0).unwrap();
+
+        let out =
+            version_metadata_from_info_plist(&info, Some(modified), stale_download_metadata())
+                .unwrap();
+
+        assert_eq!(out.release_date.as_deref(), Some("2024-03-19T12:00:00Z"));
+    }
+
+    #[test]
+    fn invalid_info_plist_release_date_is_an_error() {
+        let mut info = plist::Dictionary::new();
+        info.insert(
+            "releaseDate".into(),
+            plist::Value::String("not-a-date".into()),
+        );
+
+        let err = version_metadata_from_info_plist(&info, None, HashMap::new()).unwrap_err();
+
+        assert!(
+            matches!(err, ClientError::UnexpectedResponse(msg) if msg == "invalid release date: not-a-date")
+        );
     }
 
     #[test]
