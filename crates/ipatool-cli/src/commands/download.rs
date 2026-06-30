@@ -121,6 +121,7 @@ async fn purchase_for_download(
     match api::purchase::purchase(client, app_id, account).await {
         Ok(()) => Ok(()),
         Err(e) if e.is_token_expired() => {
+            eprintln!("Token expired during purchase, re-authenticating...");
             *account = reauth_or_fail(client, account).await?;
             api::purchase::purchase(client, app_id, account)
                 .await

@@ -10,7 +10,6 @@ use ipatool_core::client::AppleClient;
 use ipatool_core::model::Account;
 
 pub async fn reauth_or_fail(client: &AppleClient, account: &Account) -> Result<Account> {
-    eprintln!("Token expired, re-authenticating...");
     let new_account = ipatool_core::api::reauth::reauthenticate(client, account)
         .await
         .context("re-authentication failed")?;
