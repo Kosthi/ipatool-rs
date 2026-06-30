@@ -5,7 +5,10 @@ use ipatool_core::client::AppleClient;
 use ipatool_core::model::storefront::country_code_from_store_front;
 use ipatool_core::model::{Account, Platform};
 
+use super::reauth_or_fail;
 use crate::output::{self, OutputFormat};
+
+const MAX_VERSION_ATTEMPTS: u32 = 3;
 
 pub async fn list(
     client: &AppleClient,
@@ -15,14 +18,37 @@ pub async fn list(
     format: OutputFormat,
 ) -> Result<()> {
     let resolved_app_id = resolve_app_id(client, app_id, bundle_identifier, account).await?;
+    let mut account = account.clone();
+    let mut result = None;
+    let mut last_error = None;
 
-    let result = match api::versions::list_versions(client, resolved_app_id, account).await {
-        Ok(result) => result,
-        Err(e) if e.is_license_not_found() => {
-            return Err(license_not_found_error(bundle_identifier));
+    for attempt in 0..MAX_VERSION_ATTEMPTS {
+        match api::versions::list_versions(client, resolved_app_id, &account).await {
+            Ok(versions) => {
+                result = Some(versions);
+                break;
+            }
+            Err(e) if e.is_license_not_found() => {
+                return Err(license_not_found_error(bundle_identifier));
+            }
+            Err(e) if e.is_token_expired() && attempt + 1 < MAX_VERSION_ATTEMPTS => {
+                last_error = Some(e.to_string());
+                eprintln!(
+                    "Token expired, re-authenticating (attempt {})...",
+                    attempt + 1
+                );
+                account = reauth_or_fail(client, &account).await?;
+            }
+            Err(e) => return Err(e).context("failed to list versions"),
         }
-        Err(e) => return Err(e).context("failed to list versions"),
-    };
+    }
+
+    let result = result.with_context(|| {
+        last_error.map_or_else(
+            || "failed to list versions after retries".to_string(),
+            |e| format!("failed to list versions after retries: {e}"),
+        )
+    })?;
 
     match format {
         OutputFormat::Text => {
@@ -60,17 +86,40 @@ pub async fn meta(
     format: OutputFormat,
 ) -> Result<()> {
     let resolved_app_id = resolve_app_id(client, app_id, bundle_identifier, account).await?;
+    let mut account = account.clone();
 
-    let result =
-        match api::versions::get_version_metadata(client, resolved_app_id, account, version_id)
+    let mut result = None;
+    let mut last_error = None;
+
+    for attempt in 0..MAX_VERSION_ATTEMPTS {
+        match api::versions::get_version_metadata(client, resolved_app_id, &account, version_id)
             .await
         {
-            Ok(result) => result,
+            Ok(metadata) => {
+                result = Some(metadata);
+                break;
+            }
             Err(e) if e.is_license_not_found() => {
                 return Err(license_not_found_error(bundle_identifier));
             }
+            Err(e) if e.is_token_expired() && attempt + 1 < MAX_VERSION_ATTEMPTS => {
+                last_error = Some(e.to_string());
+                eprintln!(
+                    "Token expired, re-authenticating (attempt {})...",
+                    attempt + 1
+                );
+                account = reauth_or_fail(client, &account).await?;
+            }
             Err(e) => return Err(e).context("failed to get version metadata"),
-        };
+        }
+    }
+
+    let result = result.with_context(|| {
+        last_error.map_or_else(
+            || "failed to get version metadata after retries".to_string(),
+            |e| format!("failed to get version metadata after retries: {e}"),
+        )
+    })?;
 
     match format {
         OutputFormat::Text => {

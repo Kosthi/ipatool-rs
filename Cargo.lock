@@ -1096,6 +1096,7 @@ version = "0.1.2"
 dependencies = [
  "bytes",
  "cookie_store 0.21.1",
+ "flate2",
  "futures-util",
  "indicatif",
  "keyring",
@@ -1107,6 +1108,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "time",
  "tokio",
  "tracing",
  "url",
