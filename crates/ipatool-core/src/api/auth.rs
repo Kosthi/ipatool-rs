@@ -79,11 +79,7 @@ pub async fn login(
 
         let resp_body = resp.bytes().await?;
 
-        tracing::debug!(
-            len = resp_body.len(),
-            preview = %String::from_utf8_lossy(&resp_body[..resp_body.len().min(500)]),
-            "auth response body"
-        );
+        tracing::debug!(len = resp_body.len(), "auth response body received");
 
         if resp_body.is_empty() {
             return Err(ClientError::UnexpectedResponse(format!(

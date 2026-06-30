@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
+use std::time::Duration;
 
 use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
@@ -42,6 +45,7 @@ mod serde_bytes {
 }
 
 const MAX_DOWNLOAD_ATTEMPTS: u32 = 3;
+const DOWNLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub async fn get_download_info(
     client: &AppleClient,
@@ -120,11 +124,7 @@ async fn try_get_download_info(
     tracing::debug!(%status, "download response status");
 
     let resp_body = resp.bytes().await?;
-    tracing::debug!(
-        len = resp_body.len(),
-        preview = %String::from_utf8_lossy(&resp_body[..resp_body.len().min(500)]),
-        "download response body"
-    );
+    tracing::debug!(len = resp_body.len(), "download response body received");
     let dict: HashMap<String, plist::Value> =
         crate::client::plist_xml::parse_plist_response(&resp_body)?;
 
@@ -179,6 +179,37 @@ pub async fn download_file(
     dest: &Path,
     show_progress: bool,
 ) -> Result<(), ClientError> {
+    download_file_with_connections(client, url, dest, show_progress, 1).await
+}
+
+pub async fn download_file_with_connections(
+    client: &AppleClient,
+    url: &str,
+    dest: &Path,
+    show_progress: bool,
+    connections: usize,
+) -> Result<(), ClientError> {
+    if connections <= 1 {
+        return download_file_sequential(client, url, dest, show_progress).await;
+    }
+
+    match fetch_download_size(client, url).await {
+        Ok(size) => {
+            download_file_parallel(client, url, dest, show_progress, connections, size).await
+        }
+        Err(err) => {
+            tracing::warn!(%err, "parallel download unavailable, falling back to sequential");
+            download_file_sequential(client, url, dest, show_progress).await
+        }
+    }
+}
+
+async fn download_file_sequential(
+    client: &AppleClient,
+    url: &str,
+    dest: &Path,
+    show_progress: bool,
+) -> Result<(), ClientError> {
     let existing_size = if dest.exists() {
         tokio::fs::metadata(dest)
             .await
@@ -194,18 +225,35 @@ pub async fn download_file(
         tracing::info!(existing_size, "resuming download");
     }
 
-    let resp = req.send().await?;
+    let resp = req.header("Accept-Encoding", "identity").send().await?;
 
     if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
         tracing::info!("file already fully downloaded");
         return Ok(());
     }
 
-    let total_size = resp.content_length().map(|cl| cl + existing_size);
+    let status = resp.status();
+    let resumed = existing_size > 0 && status == reqwest::StatusCode::PARTIAL_CONTENT;
+    let restart = existing_size > 0 && status == reqwest::StatusCode::OK;
+    if existing_size > 0 && restart {
+        tracing::warn!("server ignored range request, restarting download");
+    } else if existing_size > 0 && !resumed {
+        return Err(unexpected_download_response(&resp, "resume download"));
+    } else if existing_size == 0 && !status.is_success() {
+        return Err(unexpected_download_response(&resp, "download"));
+    }
+    if looks_like_error_body(&resp) {
+        return Err(unexpected_download_response(&resp, "download"));
+    }
+
+    let starting_position = if resumed { existing_size } else { 0 };
+    let total_size = resp.content_length().map(|cl| cl + starting_position);
 
     let mut file = tokio::fs::OpenOptions::new()
         .create(true)
-        .append(true)
+        .append(resumed)
+        .write(true)
+        .truncate(!resumed)
         .open(dest)
         .await
         .map_err(|e| ClientError::UnexpectedResponse(format!("open file: {e}")))?;
@@ -220,7 +268,7 @@ pub async fn download_file(
                         .unwrap()
                         .progress_chars("=> "),
                 );
-                pb.set_position(existing_size);
+                pb.set_position(starting_position);
                 pb
             }
             None => {
@@ -240,8 +288,7 @@ pub async fn download_file(
     };
 
     let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
+    while let Some(chunk) = next_download_chunk(&mut stream).await? {
         file.write_all(&chunk)
             .await
             .map_err(|e| ClientError::UnexpectedResponse(format!("write: {e}")))?;
@@ -259,6 +306,220 @@ pub async fn download_file(
     }
 
     Ok(())
+}
+
+async fn download_file_parallel(
+    client: &AppleClient,
+    url: &str,
+    dest: &Path,
+    show_progress: bool,
+    connections: usize,
+    total_size: u64,
+) -> Result<(), ClientError> {
+    let connections = connections.clamp(1, 16);
+    let part_size = total_size.div_ceil(connections as u64);
+    let part_paths: Vec<PathBuf> = (0..connections)
+        .map(|idx| dest.with_extension(format!("ipa.part{idx}")))
+        .collect();
+
+    tokio::fs::remove_file(dest).await.ok();
+    for path in &part_paths {
+        tokio::fs::remove_file(path).await.ok();
+    }
+
+    let pb = if show_progress {
+        let pb = ProgressBar::new(total_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg} [{bar:40}] {bytes}/{total_bytes} {binary_bytes_per_sec} ({eta})")
+                .unwrap()
+                .progress_chars("=> "),
+        );
+        pb.set_message(format!("Downloading ({connections} connections)"));
+        Some(pb)
+    } else {
+        None
+    };
+
+    let mut tasks = FuturesUnordered::new();
+    for (idx, path) in part_paths.iter().enumerate().take(connections) {
+        let start = idx as u64 * part_size;
+        if start >= total_size {
+            continue;
+        }
+
+        let end = (start + part_size - 1).min(total_size - 1);
+        let path = path.clone();
+        let http = client.http().clone();
+        let url = url.to_string();
+        let pb = pb.clone();
+        tasks.push(tokio::spawn(async move {
+            download_range(http, url, path, start, end, pb).await
+        }));
+    }
+
+    while let Some(result) = tasks.next().await {
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                cleanup_parts(&part_paths).await;
+                if let Some(pb) = pb {
+                    pb.abandon_with_message("Download failed");
+                }
+                return Err(err);
+            }
+            Err(err) => {
+                cleanup_parts(&part_paths).await;
+                if let Some(pb) = pb {
+                    pb.abandon_with_message("Download failed");
+                }
+                return Err(ClientError::UnexpectedResponse(format!(
+                    "download task failed: {err}"
+                )));
+            }
+        }
+    }
+
+    let mut dest_file = tokio::fs::File::create(dest)
+        .await
+        .map_err(|e| ClientError::UnexpectedResponse(format!("create destination: {e}")))?;
+    for path in &part_paths {
+        let mut part = tokio::fs::File::open(path)
+            .await
+            .map_err(|e| ClientError::UnexpectedResponse(format!("open part: {e}")))?;
+        tokio::io::copy(&mut part, &mut dest_file)
+            .await
+            .map_err(|e| ClientError::UnexpectedResponse(format!("copy part: {e}")))?;
+    }
+    dest_file
+        .flush()
+        .await
+        .map_err(|e| ClientError::UnexpectedResponse(format!("flush destination: {e}")))?;
+    cleanup_parts(&part_paths).await;
+
+    if let Some(pb) = pb {
+        pb.finish_with_message("Download complete");
+    }
+
+    Ok(())
+}
+
+async fn download_range(
+    http: reqwest::Client,
+    url: String,
+    path: PathBuf,
+    start: u64,
+    end: u64,
+    pb: Option<ProgressBar>,
+) -> Result<(), ClientError> {
+    let resp = http
+        .get(&url)
+        .header("Accept-Encoding", "identity")
+        .header("Range", format!("bytes={start}-{end}"))
+        .send()
+        .await?;
+
+    if resp.status() != reqwest::StatusCode::PARTIAL_CONTENT || looks_like_error_body(&resp) {
+        return Err(unexpected_download_response(&resp, "range download"));
+    }
+
+    let mut file = tokio::fs::File::create(&path)
+        .await
+        .map_err(|e| ClientError::UnexpectedResponse(format!("create part: {e}")))?;
+    let mut stream = resp.bytes_stream();
+    let mut downloaded = 0u64;
+    let expected = end - start + 1;
+
+    while let Some(chunk) = next_download_chunk(&mut stream).await? {
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| ClientError::UnexpectedResponse(format!("write part: {e}")))?;
+        downloaded += chunk.len() as u64;
+        if let Some(ref pb) = pb {
+            pb.inc(chunk.len() as u64);
+        }
+    }
+
+    file.flush()
+        .await
+        .map_err(|e| ClientError::UnexpectedResponse(format!("flush part: {e}")))?;
+
+    if downloaded != expected {
+        return Err(ClientError::UnexpectedResponse(format!(
+            "short range download: expected {expected} bytes, got {downloaded}"
+        )));
+    }
+
+    Ok(())
+}
+
+async fn fetch_download_size(client: &AppleClient, url: &str) -> Result<u64, ClientError> {
+    let resp = client
+        .http()
+        .get(url)
+        .header("Accept-Encoding", "identity")
+        .header("Range", "bytes=0-0")
+        .send()
+        .await?;
+
+    if resp.status() != reqwest::StatusCode::PARTIAL_CONTENT || looks_like_error_body(&resp) {
+        return Err(unexpected_download_response(&resp, "download size probe"));
+    }
+
+    resp.headers()
+        .get("content-range")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.rsplit('/').next())
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or_else(|| ClientError::UnexpectedResponse("missing Content-Range total".into()))
+}
+
+async fn next_download_chunk(
+    stream: &mut (impl StreamExt<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin),
+) -> Result<Option<bytes::Bytes>, ClientError> {
+    tokio::time::timeout(DOWNLOAD_IDLE_TIMEOUT, stream.next())
+        .await
+        .map_err(|_| {
+            ClientError::UnexpectedResponse(format!(
+                "download stalled for {} seconds",
+                DOWNLOAD_IDLE_TIMEOUT.as_secs()
+            ))
+        })?
+        .transpose()
+        .map_err(ClientError::Http)
+}
+
+fn unexpected_download_response(resp: &reqwest::Response, context: &str) -> ClientError {
+    ClientError::UnexpectedResponse(format!(
+        "{context}: HTTP {}, content-type {}, content-length {}",
+        resp.status(),
+        resp.headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("<missing>"),
+        resp.content_length()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "<missing>".into())
+    ))
+}
+
+fn looks_like_error_body(resp: &reqwest::Response) -> bool {
+    resp.headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|content_type| {
+            let content_type = content_type.to_ascii_lowercase();
+            content_type.starts_with("text/")
+                || content_type.contains("html")
+                || content_type.contains("json")
+        })
+        .unwrap_or(false)
+}
+
+async fn cleanup_parts(paths: &[PathBuf]) {
+    for path in paths {
+        tokio::fs::remove_file(path).await.ok();
+    }
 }
 
 fn download_url(account: &Account, guid: &str) -> String {
