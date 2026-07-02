@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io;
 
 pub fn prompt_password(prompt: &str) -> io::Result<String> {
     let config = rpassword::ConfigBuilder::new()
@@ -8,21 +8,9 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
 }
 
 pub fn prompt_visible(prompt: &str) -> io::Result<String> {
-    let mut stderr = io::stderr();
-    write!(stderr, "{prompt}")?;
-    stderr.flush()?;
-
-    let mut input = String::new();
-    if io::stdin().read_line(&mut input)? == 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "unexpected end of console input",
-        ));
-    }
-
-    while input.ends_with(['\n', '\r']) {
-        input.pop();
-    }
-
-    Ok(input)
+    // Keep visible prompts on the controlling terminal when stdin is redirected.
+    let config = rpassword::ConfigBuilder::new()
+        .password_feedback_partial_mask('*', usize::MAX)
+        .build();
+    rpassword::prompt_password_with_config(prompt, config)
 }
