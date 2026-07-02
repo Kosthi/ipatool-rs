@@ -5,6 +5,8 @@ use ipatool_core::client::AppleClient;
 use ipatool_core::model::storefront::country_code_from_store_front;
 use ipatool_core::model::{Account, Platform};
 
+use super::app_not_found_error;
+
 pub async fn purchase(
     client: &AppleClient,
     bundle_identifier: &str,
@@ -15,10 +17,14 @@ pub async fn purchase(
 
     let app = api::lookup::lookup(client, bundle_identifier, country, Platform::IPhone)
         .await
-        .context("lookup failed")?
-        .ok_or_else(|| anyhow::anyhow!("app not found: {bundle_identifier}"))?;
+        .with_context(|| {
+            format!(
+                "lookup failed for bundle identifier {bundle_identifier} in storefront {country}"
+            )
+        })?
+        .ok_or_else(|| app_not_found_error(bundle_identifier, country))?;
 
-    eprintln!("Purchasing {} ({})", app.name, app.id);
+    eprintln!("Purchasing {} (app id: {})", app.name, app.id);
 
     match api::purchase::purchase(client, app.id, account).await {
         Ok(()) => {}

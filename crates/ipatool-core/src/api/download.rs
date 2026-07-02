@@ -19,6 +19,18 @@ pub struct DownloadItem {
     pub metadata: HashMap<String, plist::Value>,
 }
 
+impl DownloadItem {
+    pub fn latest_external_version_id(&self) -> Option<String> {
+        metadata_string(
+            &self.metadata,
+            &[
+                "softwareVersionExternalIdentifier",
+                "externalVersionIdentifier",
+            ],
+        )
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Sinf {
     pub id: i64,
@@ -173,6 +185,19 @@ fn download_item_from_dict(
         .map_err(ClientError::PlistDe)
 }
 
+fn metadata_string(metadata: &HashMap<String, plist::Value>, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| metadata.get(*key).and_then(metadata_value_to_string))
+}
+
+fn metadata_value_to_string(value: &plist::Value) -> Option<String> {
+    match value {
+        plist::Value::String(s) => Some(s.clone()),
+        plist::Value::Integer(i) => i.as_signed().map(|n| n.to_string()),
+        _ => None,
+    }
+}
+
 pub async fn download_file(
     client: &AppleClient,
     url: &str,
@@ -323,5 +348,71 @@ mod tests {
         let err = download_item_from_response_dict(&dict).unwrap_err();
 
         assert!(err.is_token_expired());
+    }
+
+    #[test]
+    fn download_item_reads_current_latest_version_id() {
+        let mut item = plist::Dictionary::new();
+        item.insert(
+            "URL".into(),
+            plist::Value::String("https://example.invalid/app.ipa".into()),
+        );
+        item.insert("sinfs".into(), plist::Value::Array(Vec::new()));
+        let mut metadata = plist::Dictionary::new();
+        metadata.insert(
+            "softwareVersionExternalIdentifier".into(),
+            plist::Value::Integer(887118713.into()),
+        );
+        item.insert("metadata".into(), plist::Value::Dictionary(metadata));
+
+        let item: DownloadItem = plist::from_value(&plist::Value::Dictionary(item)).unwrap();
+
+        assert_eq!(
+            item.latest_external_version_id().as_deref(),
+            Some("887118713")
+        );
+    }
+
+    #[test]
+    fn download_item_reads_legacy_latest_version_id() {
+        let mut item = plist::Dictionary::new();
+        item.insert(
+            "URL".into(),
+            plist::Value::String("https://example.invalid/app.ipa".into()),
+        );
+        item.insert("sinfs".into(), plist::Value::Array(Vec::new()));
+        let mut metadata = plist::Dictionary::new();
+        metadata.insert(
+            "externalVersionIdentifier".into(),
+            plist::Value::String("12345678".into()),
+        );
+        item.insert("metadata".into(), plist::Value::Dictionary(metadata));
+
+        let item: DownloadItem = plist::from_value(&plist::Value::Dictionary(item)).unwrap();
+
+        assert_eq!(
+            item.latest_external_version_id().as_deref(),
+            Some("12345678")
+        );
+    }
+
+    #[test]
+    fn download_item_does_not_guess_latest_version_id_from_array() {
+        let mut item = plist::Dictionary::new();
+        item.insert(
+            "URL".into(),
+            plist::Value::String("https://example.invalid/app.ipa".into()),
+        );
+        item.insert("sinfs".into(), plist::Value::Array(Vec::new()));
+        let mut metadata = plist::Dictionary::new();
+        metadata.insert(
+            "softwareVersionExternalIdentifiers".into(),
+            plist::Value::Array(vec![plist::Value::Integer(887118713.into())]),
+        );
+        item.insert("metadata".into(), plist::Value::Dictionary(metadata));
+
+        let item: DownloadItem = plist::from_value(&plist::Value::Dictionary(item)).unwrap();
+
+        assert_eq!(item.latest_external_version_id(), None);
     }
 }

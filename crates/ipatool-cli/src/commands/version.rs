@@ -5,7 +5,9 @@ use ipatool_core::client::AppleClient;
 use ipatool_core::model::storefront::country_code_from_store_front;
 use ipatool_core::model::{Account, Platform};
 
-use super::reauth_or_fail;
+use super::{
+    app_not_found_error, is_empty_song_list_error, reauth_or_fail, version_not_found_error,
+};
 use crate::output::{self, OutputFormat};
 
 const MAX_VERSION_ATTEMPTS: u32 = 3;
@@ -102,6 +104,13 @@ pub async fn meta(
             Err(e) if e.is_license_not_found() => {
                 return Err(license_not_found_error(bundle_identifier));
             }
+            Err(e) if is_empty_song_list_error(&e) => {
+                return Err(version_not_found_error(
+                    version_id,
+                    resolved_app_id,
+                    bundle_identifier,
+                ));
+            }
             Err(e) if e.is_token_expired() && attempt + 1 < MAX_VERSION_ATTEMPTS => {
                 last_error = Some(e.to_string());
                 eprintln!(
@@ -154,8 +163,10 @@ async fn resolve_app_id(
             let country = country_code_from_store_front(&account.store_front).unwrap_or("US");
             let app = api::lookup::lookup(client, bid, country, Platform::IPhone)
                 .await
-                .context("lookup failed")?
-                .ok_or_else(|| anyhow::anyhow!("app not found: {bid}"))?;
+                .with_context(|| {
+                    format!("lookup failed for bundle identifier {bid} in storefront {country}")
+                })?
+                .ok_or_else(|| app_not_found_error(bid, country))?;
             Ok(app.id)
         }
     }

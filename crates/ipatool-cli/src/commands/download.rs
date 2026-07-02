@@ -10,7 +10,9 @@ use ipatool_core::ipa::patch;
 use ipatool_core::model::storefront::country_code_from_store_front;
 use ipatool_core::model::{Account, Platform};
 
-use super::reauth_or_fail;
+use super::{
+    app_not_found_error, is_empty_song_list_error, reauth_or_fail, version_not_found_error,
+};
 
 const MAX_ATTEMPTS: u32 = 3;
 
@@ -35,9 +37,11 @@ pub async fn download(
             })?;
             let app = api::lookup::lookup(client, bid, country, platform)
                 .await
-                .context("lookup failed")?
-                .ok_or_else(|| anyhow::anyhow!("app not found: {bid}"))?;
-            eprintln!("Found: {} ({})", app.name, app.id);
+                .with_context(|| {
+                    format!("lookup failed for bundle identifier {bid} in storefront {country}")
+                })?
+                .ok_or_else(|| app_not_found_error(bid, country))?;
+            eprintln!("Found: {} (app id: {})", app.name, app.id);
             app.id
         }
     };
@@ -75,6 +79,13 @@ pub async fn download(
             Err(e) if e.is_license_not_found() => {
                 return Err(e).context("license not found (use --purchase to acquire)");
             }
+            Err(e) if version_id.is_some() && is_empty_song_list_error(&e) => {
+                return Err(version_not_found_error(
+                    version_id.unwrap(),
+                    resolved_app_id,
+                    bundle_identifier,
+                ));
+            }
             Err(e) => {
                 return Err(e).context("failed to get download info");
             }
@@ -94,8 +105,26 @@ pub async fn download(
         .and_then(|v| v.as_string())
         .unwrap_or("unknown");
 
+    let latest_version_id = item.latest_external_version_id();
+    let filename_version = match version_id {
+        Some(id) => {
+            eprintln!("Downloading version id: {id}");
+            id
+        }
+        None => match latest_version_id.as_deref() {
+            Some(id) => {
+                eprintln!("Downloading latest version id: {id}");
+                id
+            }
+            None => {
+                eprintln!("Downloading latest version");
+                "latest"
+            }
+        },
+    };
+
     let bid = bundle_identifier.unwrap_or("app");
-    let filename = format!("{bid}_{resolved_app_id}_{version}.ipa");
+    let filename = format!("{bid}_{filename_version}_{version}.ipa");
     let dest = output.unwrap_or_else(|| PathBuf::from(&filename));
     let tmp_path = dest.with_extension("ipa.tmp");
 
