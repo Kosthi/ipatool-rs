@@ -211,8 +211,11 @@ fn handle_search_input(app: &mut App_, key: KeyEvent) {
 
 fn handle_login_email(app: &mut App_, key: KeyEvent) {
     match key.code {
-        KeyCode::Enter | KeyCode::Tab => {
+        KeyCode::Enter | KeyCode::Tab | KeyCode::Down => {
             app.input_mode = InputMode::LoginPassword;
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            app.input_mode = InputMode::LoginAuthCode;
         }
         KeyCode::Esc => {
             app.input_mode = InputMode::Normal;
@@ -230,8 +233,11 @@ fn handle_login_password(app: &mut App_, key: KeyEvent) {
             app.input_mode = InputMode::Normal;
             app.action_tx.send(Action::SubmitLogin).ok();
         }
-        KeyCode::Tab => {
+        KeyCode::Tab | KeyCode::Down => {
             app.input_mode = InputMode::LoginAuthCode;
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            app.input_mode = InputMode::LoginEmail;
         }
         KeyCode::Esc => {
             app.input_mode = InputMode::Normal;
@@ -252,10 +258,10 @@ fn handle_login_auth_code(app: &mut App_, key: KeyEvent) {
             app.input_mode = InputMode::Normal;
             app.action_tx.send(Action::SubmitLogin).ok();
         }
-        KeyCode::Tab => {
+        KeyCode::Tab | KeyCode::Down => {
             app.input_mode = InputMode::LoginEmail;
         }
-        KeyCode::BackTab => {
+        KeyCode::BackTab | KeyCode::Up => {
             app.input_mode = InputMode::LoginPassword;
         }
         KeyCode::Esc => {
@@ -358,5 +364,23 @@ mod tests {
             other => panic!("expected one switch-tab action, got {other:?}"),
         }
         assert!(action_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn arrow_keys_move_login_field_focus() {
+        let mut app = test_app();
+        app.input_mode = InputMode::LoginEmail;
+
+        handle_key(&mut app, key(KeyCode::Down, KeyEventKind::Press));
+        assert_eq!(app.input_mode, InputMode::LoginPassword);
+
+        handle_key(&mut app, key(KeyCode::Down, KeyEventKind::Press));
+        assert_eq!(app.input_mode, InputMode::LoginAuthCode);
+
+        handle_key(&mut app, key(KeyCode::Up, KeyEventKind::Press));
+        assert_eq!(app.input_mode, InputMode::LoginPassword);
+
+        handle_key(&mut app, key(KeyCode::Up, KeyEventKind::Press));
+        assert_eq!(app.input_mode, InputMode::LoginEmail);
     }
 }

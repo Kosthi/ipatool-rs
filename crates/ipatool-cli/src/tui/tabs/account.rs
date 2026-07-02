@@ -184,7 +184,7 @@ fn render_login_form(f: &mut Frame, app: &App_, area: Rect) {
         ))]
     } else if email_active || pass_active || auth_code_active {
         vec![Line::from(Span::styled(
-            "  Tab: next field  Enter: submit  Esc: cancel",
+            "  Tab/Up/Down: field  Enter: submit  Esc: cancel",
             theme::label(),
         ))]
     } else {

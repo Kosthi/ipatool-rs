@@ -534,9 +534,9 @@ fn render_status_bar(f: &mut ratatui::Frame, app: &App_, area: Rect) {
             ActiveTab::Account => &[("q", "quit"), ("l", "login"), ("Tab", "next")],
         },
         InputMode::SearchInput => &[("Enter", "search"), ("Esc", "cancel")],
-        InputMode::LoginEmail => &[("Tab", "next"), ("Esc", "cancel")],
-        InputMode::LoginPassword => &[("Enter", "submit"), ("Esc", "cancel")],
-        InputMode::LoginAuthCode => &[("Enter", "submit"), ("Esc", "cancel")],
+        InputMode::LoginEmail => &[("Tab/Down", "next"), ("Esc", "cancel")],
+        InputMode::LoginPassword => &[("Enter", "submit"), ("Up/Down", "field"), ("Esc", "cancel")],
+        InputMode::LoginAuthCode => &[("Enter", "submit"), ("Up/Down", "field"), ("Esc", "cancel")],
         InputMode::Popup(_) => &[("Esc", "close")],
     };
 
