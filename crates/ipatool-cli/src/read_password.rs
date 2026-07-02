@@ -35,9 +35,11 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
         };
 
         if result == 0 {
+            output.write("\n").ok();
             return Err(io::Error::last_os_error());
         }
         if chars_read == 0 {
+            output.write("\n").ok();
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
                 "unexpected end of console input",
@@ -81,7 +83,7 @@ enum PromptOutput {
 #[cfg(windows)]
 impl PromptOutput {
     fn open() -> Self {
-        match open_console_device("CONOUT$") {
+        match open_console_device("CONOUT$", GENERIC_WRITE) {
             Ok(handle) => Self::Console(handle),
             Err(_) => Self::Stderr,
         }
@@ -143,7 +145,7 @@ impl ConsoleInput {
             }
         }
 
-        let handle = open_console_device("CONIN$")?;
+        let handle = open_console_device("CONIN$", GENERIC_READ)?;
 
         let mut original_mode = 0;
         if unsafe { GetConsoleMode(handle, &mut original_mode) } == 0 {
@@ -180,12 +182,12 @@ fn is_invalid_handle(handle: Handle) -> bool {
 }
 
 #[cfg(windows)]
-fn open_console_device(name: &str) -> io::Result<Handle> {
+fn open_console_device(name: &str, access: u32) -> io::Result<Handle> {
     let path = format!("{name}\0").encode_utf16().collect::<Vec<u16>>();
     let handle = unsafe {
         CreateFileW(
             path.as_ptr(),
-            GENERIC_READ | GENERIC_WRITE,
+            access,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             ptr::null_mut(),
             OPEN_EXISTING,
