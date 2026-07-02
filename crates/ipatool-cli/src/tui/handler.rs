@@ -1,10 +1,14 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use tui_input::backend::crossterm::EventHandler;
 
 use super::action::Action;
 use super::app::{ActiveTab, App_, InputMode};
 
 pub fn handle_key(app: &mut App_, key: KeyEvent) {
+    if key.kind == KeyEventKind::Release {
+        return;
+    }
+
     if let InputMode::Popup(_) = &app.input_mode {
         match key.code {
             KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
@@ -261,5 +265,98 @@ fn handle_login_auth_code(app: &mut App_, key: KeyEvent) {
             app.login_auth_code
                 .handle_event(&crossterm::event::Event::Key(key));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+    use ratatui::widgets::{ListState, TableState};
+    use tokio::sync::mpsc::{self, UnboundedReceiver};
+    use tokio::sync::{Mutex, Semaphore};
+    use tui_input::Input;
+
+    use ipatool_core::client::AppleClient;
+    use ipatool_core::model::Platform;
+
+    use super::*;
+    use crate::tui::app::{ActiveTab, App_, InputMode};
+
+    fn test_app_with_rx() -> (App_, UnboundedReceiver<Action>) {
+        let (action_tx, action_rx) = mpsc::unbounded_channel();
+        let client = AppleClient::new("test-guid".to_string(), None).unwrap();
+
+        let app = App_ {
+            active_tab: ActiveTab::Search,
+            input_mode: InputMode::Normal,
+            should_quit: false,
+            action_tx,
+            search_input: Input::default(),
+            search_results: Vec::new(),
+            search_table_state: TableState::default(),
+            search_platform: Platform::IPhone,
+            search_country: "US".to_string(),
+            is_loading: false,
+            selected_detail: None,
+            downloads: Vec::new(),
+            download_list_state: ListState::default(),
+            download_semaphore: Arc::new(Semaphore::new(3)),
+            next_download_id: 0,
+            account: None,
+            login_email: Input::default(),
+            login_password: String::new(),
+            login_auth_code: Input::default(),
+            login_error: None,
+            client: Arc::new(Mutex::new(client)),
+            status_message: String::new(),
+        };
+
+        (app, action_rx)
+    }
+
+    fn test_app() -> App_ {
+        test_app_with_rx().0
+    }
+
+    fn key(code: KeyCode, kind: KeyEventKind) -> KeyEvent {
+        KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind)
+    }
+
+    #[test]
+    fn ignores_key_release_events() {
+        let mut app = test_app();
+        app.input_mode = InputMode::LoginPassword;
+
+        handle_key(&mut app, key(KeyCode::Char('p'), KeyEventKind::Press));
+        handle_key(&mut app, key(KeyCode::Char('p'), KeyEventKind::Release));
+
+        assert_eq!(app.login_password, "p");
+    }
+
+    #[test]
+    fn preserves_key_repeat_events() {
+        let mut app = test_app();
+        app.input_mode = InputMode::LoginPassword;
+
+        handle_key(&mut app, key(KeyCode::Char('p'), KeyEventKind::Press));
+        handle_key(&mut app, key(KeyCode::Char('p'), KeyEventKind::Repeat));
+
+        assert_eq!(app.login_password, "pp");
+    }
+
+    #[test]
+    fn ignores_key_release_events_for_navigation() {
+        let (mut app, mut action_rx) = test_app_with_rx();
+
+        handle_key(&mut app, key(KeyCode::Tab, KeyEventKind::Press));
+        handle_key(&mut app, key(KeyCode::Tab, KeyEventKind::Release));
+
+        match action_rx.try_recv() {
+            Ok(Action::SwitchTab(ActiveTab::Library)) => {}
+            other => panic!("expected one switch-tab action, got {other:?}"),
+        }
+        assert!(action_rx.try_recv().is_err());
     }
 }

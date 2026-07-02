@@ -1,5 +1,6 @@
 mod commands;
 mod output;
+mod read_password;
 mod tui;
 
 use std::path::PathBuf;
