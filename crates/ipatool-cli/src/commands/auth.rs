@@ -6,6 +6,7 @@ use ipatool_core::credential;
 use ipatool_core::error::{ClientError, StoreError};
 
 use crate::output::{OutputFormat, print_account};
+use crate::read_password;
 
 pub async fn login(
     client: &mut AppleClient,
@@ -21,7 +22,7 @@ pub async fn login(
             if non_interactive {
                 bail!("password required in non-interactive mode");
             }
-            rpassword::prompt_password("Password: ").context("failed to read password")?
+            read_password::prompt_password("Password: ").context("failed to read password")?
         }
     };
 
@@ -39,7 +40,7 @@ pub async fn login(
             eprintln!(
                 "Apple rejected the login. If Apple is showing a two-factor code, enter it now; otherwise press Enter and check your password."
             );
-            let auth_code = rpassword::prompt_password("Two-factor code (optional): ")
+            let auth_code = read_password::prompt_password("Two-factor code (optional): ")
                 .context("failed to read 2FA code")?;
             let auth_code = auth_code.trim();
             if auth_code.is_empty() {
