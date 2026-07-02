@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-02
+
+### Fixed
+
+- Fixed duplicated password input on Windows in both CLI login prompts and TUI login fields.
+- Clarified `version download` output by showing the resolved version ID and using it in default IPA filenames.
+- Improved errors for missing bundle identifiers and unavailable version IDs with storefront- and command-specific guidance.
+
 ## [0.1.3] - 2026-06-30
 
 ### Fixed
