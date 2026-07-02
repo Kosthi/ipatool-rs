@@ -5,47 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.5] - 2026-07-02
 
+### 🐛 Bug Fixes
+
+- **cli:** read visible prompts from terminal
+- **cli:** improve login input UX
 ## [0.1.4] - 2026-07-02
 
-### Fixed
+### 🐛 Bug Fixes
 
-- Fixed duplicated password input on Windows in both CLI login prompts and TUI login fields.
-- Clarified `version download` output by showing the resolved version ID and using it in default IPA filenames.
-- Improved errors for missing bundle identifiers and unavailable version IDs with storefront- and command-specific guidance.
-
+- **cli:** clarify version download output
+- split Windows console access
+- keep Windows password prompt visible
+- handle Windows input duplication
 ## [0.1.3] - 2026-06-30
 
-### Fixed
+### 🐛 Bug Fixes
 
-- Read `version meta` values from the selected IPA's main `Info.plist` instead of stale App Store download metadata.
-- Added targeted remote ZIP range reading for `Info.plist` so version metadata can be inspected without downloading the full IPA.
-- Re-authenticate and retry `version list` and `version meta` when stored password tokens expire.
+- avoid duplicate reauth logs
+- read version metadata from IPA plist
+### ⚙️ Miscellaneous
 
+- release v0.1.3
 ## [0.1.2] - 2026-06-29
 
-### Fixed
+### 🐛 Bug Fixes
 
-- Fixed `version list` requests for Apple's current response shape, including parsing version IDs from `songList` metadata and exposing the latest external version ID.
-- Improved `version list` text output by removing placeholder `version: ?` labels and marking the latest external version.
-- Added clearer guidance when version commands require purchasing the app first.
-- Preserved the selected IPA app bundle and directory metadata when patching downloaded archives.
+- **core:** preserve IPA app selection and directory metadata
+- repair version list parsing
+### 📚 Documentation
 
+- update 0.1.2 changelog
 ## [0.1.1] - 2026-06-29
 
-### Changed
+### 🐛 Bug Fixes
 
-- Migrated release packaging to `cargo-dist`, producing Homebrew, shell, and PowerShell installers plus platform archives and checksums.
-- Replaced macOS DMG packaging with CLI-friendly `tar.xz` archives to avoid unsigned installer script Gatekeeper prompts.
+- **cli:** handle 2fa login rejection
+### 📚 Documentation
 
+- document ipa output path
+### ⚙️ Miscellaneous
+
+- release v0.1.1
 ## [0.1.0] - 2026-06-29
 
-### Added
+### 🚀 Features
 
-- Initial Rust implementation of the `ipatool` CLI for searching, purchasing, and downloading IPA files.
-- Interactive terminal UI with Search, Library, Downloads, and Account tabs.
-- Apple ID login, 2FA handling, credential storage, and token refresh flows.
-- App Store search, purchase, download, version listing, and IPA patching commands.
-- Text and JSON output modes for scripting.
-- CI and release workflows for Linux, macOS, and Windows builds.
+- add TUI mode and improve token/retry resilience
+### 🐛 Bug Fixes
+
+- align App Store download license handling
+- resolve clippy and rustfmt warnings in TUI code
+- resolve rustfmt and clippy warnings
+- correct repository URL in cliff.toml
+### 📚 Documentation
+
+- let logo lead README
+- showcase TUI in README
+### 🎨 Style
+
+- reformat code for Rust 1.96 rustfmt
+### ⚙️ Miscellaneous
+
+- migrate releases to cargo-dist
+- add installable release artifacts
+- add CI and release workflows
+- add commit convention and changelog tooling
+[0.1.5]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.0...v0.1.1
+
