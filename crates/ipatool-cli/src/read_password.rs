@@ -9,10 +9,8 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
 
 #[cfg(windows)]
 pub fn prompt_password(prompt: &str) -> io::Result<String> {
-    use std::io::Write;
-
-    write!(io::stderr(), "{prompt}")?;
-    io::stderr().flush()?;
+    let mut output = PromptOutput::open();
+    output.write(prompt)?;
 
     let input = ConsoleInput::open()?;
 
@@ -63,7 +61,7 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
         data.pop();
     }
 
-    writeln!(io::stderr())?;
+    output.write("\n")?;
 
     let password = String::from_utf16(&data)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-16 input"))?;
@@ -73,6 +71,55 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
 
 #[cfg(windows)]
 type Handle = *mut std::ffi::c_void;
+
+#[cfg(windows)]
+enum PromptOutput {
+    Console(Handle),
+    Stderr,
+}
+
+#[cfg(windows)]
+impl PromptOutput {
+    fn open() -> Self {
+        match open_console_device("CONOUT$") {
+            Ok(handle) => Self::Console(handle),
+            Err(_) => Self::Stderr,
+        }
+    }
+
+    fn write(&mut self, text: &str) -> io::Result<()> {
+        match self {
+            Self::Console(handle) => {
+                if write_console(*handle, text).is_ok() {
+                    return Ok(());
+                }
+
+                unsafe {
+                    CloseHandle(*handle);
+                }
+                *self = Self::Stderr;
+                self.write(text)
+            }
+            Self::Stderr => {
+                use std::io::Write;
+
+                write!(io::stderr(), "{text}")?;
+                io::stderr().flush()
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for PromptOutput {
+    fn drop(&mut self) {
+        if let Self::Console(handle) = self {
+            unsafe {
+                CloseHandle(*handle);
+            }
+        }
+    }
+}
 
 #[cfg(windows)]
 struct ConsoleInput {
@@ -96,21 +143,7 @@ impl ConsoleInput {
             }
         }
 
-        let conin = "CONIN$\0".encode_utf16().collect::<Vec<u16>>();
-        let handle = unsafe {
-            CreateFileW(
-                conin.as_ptr(),
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                ptr::null_mut(),
-                OPEN_EXISTING,
-                0,
-                ptr::null_mut(),
-            )
-        };
-        if is_invalid_handle(handle) {
-            return Err(io::Error::last_os_error());
-        }
+        let handle = open_console_device("CONIN$")?;
 
         let mut original_mode = 0;
         if unsafe { GetConsoleMode(handle, &mut original_mode) } == 0 {
@@ -144,6 +177,51 @@ impl Drop for ConsoleInput {
 #[cfg(windows)]
 fn is_invalid_handle(handle: Handle) -> bool {
     handle.is_null() || handle as isize == -1
+}
+
+#[cfg(windows)]
+fn open_console_device(name: &str) -> io::Result<Handle> {
+    let path = format!("{name}\0").encode_utf16().collect::<Vec<u16>>();
+    let handle = unsafe {
+        CreateFileW(
+            path.as_ptr(),
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            ptr::null_mut(),
+            OPEN_EXISTING,
+            0,
+            ptr::null_mut(),
+        )
+    };
+    if is_invalid_handle(handle) {
+        return Err(io::Error::last_os_error());
+    }
+
+    Ok(handle)
+}
+
+#[cfg(windows)]
+fn write_console(handle: Handle, text: &str) -> io::Result<()> {
+    let data = text.encode_utf16().collect::<Vec<u16>>();
+    if data.is_empty() {
+        return Ok(());
+    }
+
+    let mut chars_written: u32 = 0;
+    let result = unsafe {
+        WriteConsoleW(
+            handle,
+            data.as_ptr(),
+            data.len() as u32,
+            &mut chars_written,
+            ptr::null_mut(),
+        )
+    };
+    if result == 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -186,5 +264,12 @@ unsafe extern "system" {
         dwFlagsAndAttributes: u32,
         hTemplateFile: Handle,
     ) -> Handle;
+    fn WriteConsoleW(
+        hConsoleOutput: Handle,
+        lpBuffer: *const u16,
+        nNumberOfCharsToWrite: u32,
+        lpNumberOfCharsWritten: *mut u32,
+        lpReserved: *mut std::ffi::c_void,
+    ) -> i32;
     fn CloseHandle(hObject: Handle) -> i32;
 }
