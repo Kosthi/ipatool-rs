@@ -40,7 +40,7 @@ pub async fn login(
             eprintln!(
                 "Apple rejected the login. If Apple is showing a two-factor code, enter it now; otherwise press Enter and check your password."
             );
-            let auth_code = read_password::prompt_password("Two-factor code (optional): ")
+            let auth_code = read_password::prompt_visible("Two-factor code (optional): ")
                 .context("failed to read 2FA code")?;
             let auth_code = auth_code.trim();
             if auth_code.is_empty() {
