@@ -279,11 +279,15 @@ This usually means the stored token has expired and Apple is requiring a fresh l
 
 All storefronts supported by the iTunes Search API. Use `--country <ISO-3166-1-alpha-2>` (e.g. `--country US`, `--country CN`) to target a specific store.
 
----
-
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Kosthi/ipatool-rs&type=Date)](https://star-history.com/#Kosthi/ipatool-rs&Date)
+<a href="https://www.star-history.com/?type=date&repos=Kosthi%2Fipatool-rs">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Kosthi/ipatool-rs&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Kosthi/ipatool-rs&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Kosthi/ipatool-rs&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## License
 
