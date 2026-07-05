@@ -7,6 +7,8 @@ description = "Core library for ipatool-rs App Store authentication, purchase, a
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 tokio.workspace = true

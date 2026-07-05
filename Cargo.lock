@@ -1071,26 +1071,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipatool"
-version = "0.1.5"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm",
- "futures-util",
- "ipatool-core",
- "ratatui",
- "rpassword",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "tui-input",
-]
-
-[[package]]
 name = "ipatool-core"
 version = "0.1.5"
 dependencies = [
@@ -1113,6 +1093,26 @@ dependencies = [
  "tracing",
  "url",
  "zip",
+]
+
+[[package]]
+name = "ipatool-rs"
+version = "0.1.5"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm",
+ "futures-util",
+ "ipatool-core",
+ "ratatui",
+ "rpassword",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "tui-input",
 ]
 
 [[package]]

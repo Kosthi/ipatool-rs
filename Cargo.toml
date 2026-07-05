@@ -10,6 +10,8 @@ description = "A terminal UI and CLI for searching, purchasing, and downloading 
 repository = "https://github.com/Kosthi/ipatool-rs"
 homepage = "https://github.com/Kosthi/ipatool-rs"
 readme = "README.md"
+keywords = ["ios", "app-store", "ipa", "cli", "tui"]
+categories = ["command-line-utilities"]
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "signal"] }

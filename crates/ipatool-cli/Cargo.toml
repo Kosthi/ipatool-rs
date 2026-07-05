@@ -1,5 +1,5 @@
 [package]
-name = "ipatool"
+name = "ipatool-rs"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -7,13 +7,15 @@ description.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [[bin]]
 name = "ipatool"
 path = "src/main.rs"
 
 [dependencies]
-ipatool-core = { path = "../ipatool-core" }
+ipatool-core = { version = "0.1.5", path = "../ipatool-core" }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
