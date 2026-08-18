@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-08-18
+
+### 🐛 Bug Fixes
+
+- **ci:** refresh release lockfile
+- **core:** keep POST body across auth pod redirects
+### ⚙️ Miscellaneous
+
+- add crates metadata and community docs
 ## [0.1.5] - 2026-07-02
 
 ### 🐛 Bug Fixes
@@ -72,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add installable release artifacts
 - add CI and release workflows
 - add commit convention and changelog tooling
+[0.1.6]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Kosthi/ipatool-rs/compare/v0.1.2...v0.1.3

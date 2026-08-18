@@ -1072,7 +1072,7 @@ dependencies = [
 
 [[package]]
 name = "ipatool-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bytes",
  "cookie_store 0.21.1",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "ipatool-rs"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "clap",
