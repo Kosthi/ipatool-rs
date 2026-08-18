@@ -46,7 +46,7 @@ pub async fn login(
         let status = resp.status();
         tracing::debug!(%status, "auth response status");
 
-        if status == reqwest::StatusCode::FOUND
+        if status.is_redirection()
             && let Some(location) = resp.headers().get("location")
         {
             redirects += 1;
@@ -60,7 +60,8 @@ pub async fn login(
                 .to_str()
                 .map_err(|_| ClientError::MissingHeader("location (invalid)".into()))?;
             tracing::debug!(new_url, "following redirect");
-            current_url = Url::parse(new_url)
+            current_url = current_url
+                .join(new_url)
                 .map_err(|e| ClientError::UnexpectedResponse(format!("redirect URL: {e}")))?;
             continue;
         }

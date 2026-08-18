@@ -12,8 +12,15 @@ use crate::model::Account;
 const USER_AGENT: &str =
     "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6";
 
-const MZFINANCE_AUTH_URL: &str =
-    "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate";
+/// Auth endpoints 302-redirect POSTs to account-specific pod hosts
+/// (e.g. p14-buy.itunes.apple.com); auto-following would turn the POST into a
+/// bodyless GET, so those redirects must surface to api::auth::login, which
+/// re-sends the full request. Matched by path so it covers the bare host, pod
+/// hosts, and the native /fast/ endpoint, with or without a trailing slash.
+fn is_auth_endpoint(url: &reqwest::Url) -> bool {
+    let path = url.path().trim_end_matches('/');
+    path.ends_with("/wa/authenticate") || path.ends_with("/native/fast")
+}
 
 pub struct AppleClient {
     http: reqwest::Client,
@@ -30,10 +37,7 @@ impl AppleClient {
             .user_agent(USER_AGENT)
             .cookie_provider(cookie_store.clone())
             .redirect(reqwest::redirect::Policy::custom(|attempt| {
-                let from_auth = attempt
-                    .previous()
-                    .last()
-                    .is_some_and(|u| u.as_str() == MZFINANCE_AUTH_URL);
+                let from_auth = attempt.previous().last().is_some_and(is_auth_endpoint);
                 if from_auth {
                     attempt.stop()
                 } else {
@@ -68,5 +72,44 @@ impl AppleClient {
 
     pub fn save_cookies(&self, path: &Path) -> Result<(), ClientError> {
         cookie_jar::save_cookie_store(&self.cookie_store, path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_auth_endpoint;
+
+    fn url(s: &str) -> reqwest::Url {
+        reqwest::Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn auth_endpoint_matches_with_and_without_trailing_slash() {
+        assert!(is_auth_endpoint(&url(
+            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+        )));
+        assert!(is_auth_endpoint(&url(
+            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate/"
+        )));
+    }
+
+    #[test]
+    fn auth_endpoint_matches_pod_hosts_and_native_fast() {
+        assert!(is_auth_endpoint(&url(
+            "https://p14-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate/"
+        )));
+        assert!(is_auth_endpoint(&url(
+            "https://auth.itunes.apple.com/auth/v1/native/fast/"
+        )));
+    }
+
+    #[test]
+    fn non_auth_endpoints_do_not_match() {
+        assert!(!is_auth_endpoint(&url(
+            "https://p14-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid=X"
+        )));
+        assert!(!is_auth_endpoint(&url(
+            "https://init.itunes.apple.com/bag.xml?ix=5"
+        )));
     }
 }
