@@ -96,7 +96,8 @@ pub unsafe fn prepare(base: *const u8) -> Result<(), ClientError> {
 unsafe fn install_virtual_alloc_hook(image: &Image) -> Result<(), ClientError> {
     let slot = unsafe { image.find_import("kernel32.dll", "VirtualAlloc") }?;
     let current = unsafe { slot.read() };
-    let hook = commit_virtual_alloc as usize;
+    // Via the pointer type: casting a function *item* to an integer is a lint.
+    let hook = commit_virtual_alloc as VirtualAllocFn as usize;
 
     if current == hook {
         // Already installed by an earlier engine in this process.
@@ -218,7 +219,7 @@ unsafe fn allocate_amd64_longjmp() -> Result<usize, ClientError> {
         )
     } == 0
     {
-        unsafe { release() };
+        release();
 
         return Err(ClientError::Sap(
             "make compatible longjmp executable".into(),
@@ -233,7 +234,7 @@ unsafe fn allocate_amd64_longjmp() -> Result<usize, ClientError> {
         )
     } == 0
     {
-        unsafe { release() };
+        release();
 
         return Err(ClientError::Sap(
             "flush compatible longjmp instructions".into(),
@@ -272,7 +273,7 @@ unsafe fn replace_import(slot: Slot, replacement: usize) -> Result<(), ClientErr
 }
 
 /// An import address table entry.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Slot(*const usize);
 
 impl Slot {
