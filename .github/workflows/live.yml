@@ -1,0 +1,88 @@
+name: Live
+
+# The tests this runs are `--ignored` in CI's normal runs because they need
+# network access and download tens of megabytes. They are also the only thing
+# that checks the artifacts this tool depends on still exist and still match
+# their pinned digests — Apple's software-update package, the Unicorn builds on
+# PyPI and MSYS2, and Apple's SAP endpoints. None of that is under our control,
+# so it is checked on a schedule rather than left for a user to discover.
+on:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  live:
+    name: Live (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+
+      # Not cached: the point is to prove the downloads still work.
+      - name: Run live tests
+        run: cargo test -p ipatool-core -- --ignored --nocapture live_
+
+  report:
+    name: Report
+    needs: live
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update an issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Live tests are failing';
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `The weekly live run failed: ${url}`,
+              '',
+              'These tests exercise the artifacts this tool downloads at runtime, so a',
+              'failure usually means one of them moved or changed rather than a bug here:',
+              '',
+              '- Apple\'s OS X 10.9 update package (URL, or the offsets into it)',
+              '- the Unicorn builds on PyPI / the unicorn-engine release / MSYS2',
+              '- Apple\'s SAP endpoints or the keys the bag advertises',
+              '',
+              'If a digest no longer matches, verify the new artifact by hand before',
+              'repinning it — these are executed, not just read.',
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'live-tests',
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['live-tests'],
+            });
