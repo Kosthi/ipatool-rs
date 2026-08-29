@@ -388,12 +388,11 @@ fn sysctlbyname(guest: &Guest<'_>) -> Result<(), ClientError> {
 }
 
 /// Fills `out` with operating-system randomness.
+///
+/// The guest reaches this through `arc4random`, so it has to work everywhere
+/// the tool runs — reading `/dev/urandom` directly does not.
 fn getrandom(out: &mut [u8]) -> Result<(), ClientError> {
-    use std::io::Read as _;
-
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut file| file.read_exact(out))
-        .map_err(|e| ClientError::Sap(format!("read system randomness: {e}")))
+    getrandom::fill(out).map_err(|e| ClientError::Sap(format!("read system randomness: {e}")))
 }
 
 #[cfg(test)]
