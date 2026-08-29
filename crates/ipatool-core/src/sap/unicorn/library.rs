@@ -259,37 +259,49 @@ fn expect_digest(data: &[u8], expected: &str, label: &str) -> Result<(), ClientE
 /// produced by [`ensure`], whose contents have been verified against pinned
 /// digests.
 pub unsafe fn open(paths: &Paths) -> Result<(Vec<Library>, Library), ClientError> {
-    // Windows needs one more step that is not implemented: after the DLL is
-    // loaded, its `longjmp` import has to be redirected, because Windows' SEH
-    // longjmp cannot unwind the frames Unicorn's generated code produces and
-    // will crash rather than return. Failing here is better than loading a
-    // library that will fault partway through a signing call.
-    #[cfg(target_os = "windows")]
-    {
-        let _ = paths;
+    let mut dependencies = Vec::with_capacity(paths.dependencies.len());
 
-        return Err(ClientError::Sap(
-            "Unicorn support on Windows is incomplete: the loaded DLL still needs its longjmp \
-             import redirected. See https://github.com/Kosthi/ipatool-rs/issues/15"
-                .into(),
-        ));
+    // Dependencies are plain support libraries; only the Unicorn DLL itself
+    // needs its imports rewritten.
+    for path in &paths.dependencies {
+        dependencies.push(unsafe { open_one(path) }?);
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let mut dependencies = Vec::with_capacity(paths.dependencies.len());
+    let library = unsafe { open_unicorn(&paths.library) }?;
 
-        for path in &paths.dependencies {
-            dependencies.push(unsafe { open_one(path) }?);
-        }
-
-        let library = unsafe { open_one(&paths.library) }?;
-
-        Ok((dependencies, library))
-    }
+    Ok((dependencies, library))
 }
 
 #[cfg(not(target_os = "windows"))]
+unsafe fn open_unicorn(path: &Path) -> Result<Library, ClientError> {
+    unsafe { open_one(path) }
+}
+
+/// Loads Unicorn and rewrites the imports it cannot be called through as
+/// shipped. See [`super::windows`].
+#[cfg(target_os = "windows")]
+unsafe fn open_unicorn(path: &Path) -> Result<Library, ClientError> {
+    use libloading::os::windows::Library as WindowsLibrary;
+
+    let loaded = unsafe { WindowsLibrary::new(path) }
+        .map_err(|e| ClientError::Sap(format!("load {}: {e}", path.display())))?;
+
+    let handle = loaded.into_raw();
+
+    // Reconstructed before preparing, so a failure below still unloads the DLL
+    // rather than leaking the handle taken out of `loaded`.
+    //
+    // SAFETY: `handle` came from a successful `LoadLibraryExW` just above and
+    // has not been used since.
+    let library = Library::from(unsafe { WindowsLibrary::from_raw(handle) });
+
+    // SAFETY: the module stays loaded for as long as `library` is alive, and it
+    // is returned to the caller on success.
+    unsafe { super::windows::prepare(handle as *const u8) }?;
+
+    Ok(library)
+}
+
 unsafe fn open_one(path: &Path) -> Result<Library, ClientError> {
     unsafe { Library::new(path) }
         .map_err(|e| ClientError::Sap(format!("load {}: {e}", path.display())))

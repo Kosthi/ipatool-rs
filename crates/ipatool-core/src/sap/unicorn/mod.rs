@@ -7,6 +7,8 @@
 pub mod artifact;
 pub mod library;
 pub mod patch;
+#[cfg(target_os = "windows")]
+pub mod windows;
 
 use std::ffi::{CStr, c_char, c_int, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
