@@ -124,14 +124,15 @@ async fn main() -> Result<()> {
         return tui::run().await;
     };
 
-    let guid_str = guid::generate_guid().context("failed to generate GUID")?;
+    let machine = guid::generate_machine_identity().context("failed to generate GUID")?;
 
     let data_dir = data_dir();
     std::fs::create_dir_all(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
-    let mut client = ipatool_core::client::AppleClient::new(guid_str, Some(&cookie_path))
-        .context("failed to create client")?;
+    let mut client =
+        ipatool_core::client::AppleClient::new(machine, Some(&cookie_path), cache_dir())
+            .context("failed to create client")?;
 
     match command {
         Commands::Auth { action } => match action {
@@ -232,6 +233,12 @@ async fn main() -> Result<()> {
 pub(crate) fn data_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     std::path::PathBuf::from(home).join(".ipatool")
+}
+
+/// Where the SAP runtime keeps its downloads. Separate from the data directory
+/// because it holds tens of megabytes that are reproducible from the network.
+pub(crate) fn cache_dir() -> std::path::PathBuf {
+    data_dir().join("cache")
 }
 
 fn load_account() -> Result<ipatool_core::model::Account> {

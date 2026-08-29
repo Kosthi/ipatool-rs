@@ -37,13 +37,14 @@ use self::app::{ActiveTab, App_, DownloadStage, InputMode};
 use self::event::{Event, EventHandler};
 
 pub async fn run() -> Result<()> {
-    let guid_str = ipatool_core::guid::generate_guid().context("failed to generate GUID")?;
+    let machine =
+        ipatool_core::guid::generate_machine_identity().context("failed to generate GUID")?;
     let data_dir = data_dir();
     std::fs::create_dir_all(&data_dir).ok();
     let cookie_path = data_dir.join("cookies.json");
 
-    let client =
-        AppleClient::new(guid_str, Some(&cookie_path)).context("failed to create client")?;
+    let client = AppleClient::new(machine, Some(&cookie_path), crate::cache_dir())
+        .context("failed to create client")?;
 
     let (action_tx, action_rx) = mpsc::unbounded_channel::<Action>();
     let mut app = App_::new(client, action_tx.clone());
@@ -297,29 +298,34 @@ async fn process_action(app: &mut App_, action: Action) {
             let tx = app.action_tx.clone();
 
             tokio::spawn(async move {
-                let auth_url = {
-                    let c = client.lock().await;
-                    ipatool_core::api::bag::fetch_auth_endpoint(&c).await
-                };
-
-                let auth_url = match auth_url {
-                    Ok(url) => url,
-                    Err(e) => {
-                        tx.send(Action::LoginError(e.to_string())).ok();
-                        return;
-                    }
-                };
-
                 let account = {
                     let c = client.lock().await;
-                    ipatool_core::api::auth::login(
-                        &c,
-                        &email,
-                        &password,
-                        auth_code.as_deref(),
-                        &auth_url,
-                    )
-                    .await
+
+                    match ipatool_core::api::bag::fetch_bag(&c).await {
+                        Ok(bag) => {
+                            match ipatool_core::sap::new_default_signer(
+                                &c,
+                                &bag.sap,
+                                c.hardware_id(),
+                            )
+                            .await
+                            {
+                                Ok(signer) => {
+                                    ipatool_core::api::auth::login(
+                                        &c,
+                                        &email,
+                                        &password,
+                                        auth_code.as_deref(),
+                                        &bag.auth_endpoint,
+                                        Some(&signer as &dyn ipatool_core::sap::ActionSigner),
+                                    )
+                                    .await
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                        Err(e) => Err(e),
+                    }
                 };
 
                 match account {

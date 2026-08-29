@@ -1,12 +1,13 @@
 pub mod cookie_jar;
 pub mod plist_xml;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use reqwest_cookie_store::CookieStoreMutex;
 
 use crate::error::ClientError;
+use crate::guid::MachineIdentity;
 use crate::model::Account;
 
 const USER_AGENT: &str =
@@ -15,22 +16,30 @@ const USER_AGENT: &str =
 /// Auth endpoints 302-redirect POSTs to account-specific pod hosts
 /// (e.g. p14-buy.itunes.apple.com); auto-following would turn the POST into a
 /// bodyless GET, so those redirects must surface to api::auth::login, which
-/// re-sends the full request. Matched by path so it covers the bare host, pod
-/// hosts, and the native /fast/ endpoint, with or without a trailing slash.
+/// re-sends the full request. Matched by path so it covers the bare host and
+/// pod hosts alike, with or without a trailing slash.
 fn is_auth_endpoint(url: &reqwest::Url) -> bool {
-    let path = url.path().trim_end_matches('/');
-    path.ends_with("/wa/authenticate") || path.ends_with("/native/fast")
+    url.path()
+        .trim_end_matches('/')
+        .ends_with("/wa/authenticate")
 }
 
 pub struct AppleClient {
     http: reqwest::Client,
     cookie_store: Arc<CookieStoreMutex>,
-    guid: String,
+    machine: MachineIdentity,
+    /// Where the SAP runtime keeps the Apple frameworks and the emulator it
+    /// downloads; they are large and pinned by digest, so they are fetched once.
+    cache_dir: PathBuf,
     account: Option<Account>,
 }
 
 impl AppleClient {
-    pub fn new(guid: String, cookie_path: Option<&Path>) -> Result<Self, ClientError> {
+    pub fn new(
+        machine: MachineIdentity,
+        cookie_path: Option<&Path>,
+        cache_dir: impl Into<PathBuf>,
+    ) -> Result<Self, ClientError> {
         let cookie_store = cookie_jar::new_cookie_store(cookie_path)?;
 
         let http = reqwest::Client::builder()
@@ -49,13 +58,23 @@ impl AppleClient {
         Ok(Self {
             http,
             cookie_store,
-            guid,
+            machine,
+            cache_dir: cache_dir.into(),
             account: None,
         })
     }
 
     pub fn guid(&self) -> &str {
-        &self.guid
+        &self.machine.guid
+    }
+
+    /// The bytes Apple's SAP handshake binds its session key to.
+    pub fn hardware_id(&self) -> &[u8] {
+        &self.machine.hardware_id
+    }
+
+    pub fn cache_dir(&self) -> &Path {
+        &self.cache_dir
     }
 
     pub fn account(&self) -> Option<&Account> {
@@ -72,6 +91,24 @@ impl AppleClient {
 
     pub fn save_cookies(&self, path: &Path) -> Result<(), ClientError> {
         cookie_jar::save_cookie_store(&self.cookie_store, path)
+    }
+
+    /// A client with a fixed identity and a shared scratch cache.
+    ///
+    /// The cache is deliberately shared between tests: the live ones download
+    /// tens of megabytes, and re-fetching per test would be slow and unkind to
+    /// the servers involved.
+    #[cfg(test)]
+    pub(crate) fn for_tests() -> Self {
+        Self::new(
+            crate::guid::MachineIdentity {
+                guid: "AABBCCDDEEFF".into(),
+                hardware_id: vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF],
+            },
+            None,
+            std::env::temp_dir().join("ipatool-rs-test-cache"),
+        )
+        .expect("build test client")
     }
 }
 
@@ -94,12 +131,9 @@ mod tests {
     }
 
     #[test]
-    fn auth_endpoint_matches_pod_hosts_and_native_fast() {
+    fn auth_endpoint_matches_pod_hosts() {
         assert!(is_auth_endpoint(&url(
             "https://p14-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate/"
-        )));
-        assert!(is_auth_endpoint(&url(
-            "https://auth.itunes.apple.com/auth/v1/native/fast/"
         )));
     }
 

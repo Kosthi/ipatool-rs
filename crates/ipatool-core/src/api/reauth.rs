@@ -1,6 +1,7 @@
 use crate::client::AppleClient;
 use crate::error::ClientError;
 use crate::model::Account;
+use crate::sap;
 
 pub async fn reauthenticate(
     client: &AppleClient,
@@ -11,12 +12,21 @@ pub async fn reauthenticate(
         .as_deref()
         .ok_or_else(|| ClientError::UnexpectedResponse("no stored password for re-auth".into()))?;
 
-    let auth_url = super::bag::fetch_auth_endpoint(client).await?;
+    let bag = super::bag::fetch_bag(client).await?;
+
+    let signer = sap::new_default_signer(client, &bag.sap, client.hardware_id()).await?;
 
     tracing::info!("re-authenticating as {}", account.email);
 
-    let mut new_account =
-        super::auth::login(client, &account.email, password, None, &auth_url).await?;
+    let mut new_account = super::auth::login(
+        client,
+        &account.email,
+        password,
+        None,
+        &bag.auth_endpoint,
+        Some(&signer),
+    )
+    .await?;
 
     new_account.password = account.password.clone();
     Ok(new_account)
