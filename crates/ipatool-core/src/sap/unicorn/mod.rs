@@ -6,6 +6,7 @@
 
 pub mod artifact;
 pub mod library;
+pub mod patch;
 
 use std::ffi::{CStr, c_char, c_int, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -179,19 +180,21 @@ pub struct Engine {
     handle: Handle,
     hooks: Vec<HookSlot>,
 
-    // Declared last so it drops last: everything above borrows from it.
+    // Declared last so they drop last: everything above borrows from them, and
+    // the dependencies must outlive the library that needs them.
     _library: Library,
+    _dependencies: Vec<Library>,
 }
 
 impl Engine {
     /// Downloads (or reuses) the pinned Unicorn build and opens an x86-64
     /// emulator.
     pub async fn open(client: &AppleClient, cache_dir: &Path) -> Result<Self, ClientError> {
-        let path = library::ensure(client, cache_dir).await?;
+        let paths = library::ensure(client, cache_dir).await?;
 
-        // SAFETY: `ensure` returns a path whose contents matched the pinned
-        // digest for this platform's Unicorn build.
-        let library = unsafe { library::open(&path) }?;
+        // SAFETY: `ensure` returns paths whose contents matched the pinned
+        // digests for this platform's Unicorn build.
+        let (dependencies, library) = unsafe { library::open(&paths) }?;
 
         // SAFETY: every signature below is the one from unicorn.h for the
         // pinned version, and the pointers live no longer than `library`.
@@ -242,6 +245,7 @@ impl Engine {
             handle,
             hooks: Vec::new(),
             _library: library,
+            _dependencies: dependencies,
         })
     }
 
