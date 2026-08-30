@@ -51,6 +51,7 @@ This rewrite adds a keyboard-driven terminal UI, structured Rust models, clearer
 - Resilient sessions: refresh expired tokens during purchase and download flows when stored credentials are available.
 - Robust downloads: stream IPA files with progress display and HTTP Range resume support in CLI mode.
 - Patch-ready IPAs: inject purchase metadata and SINF authorization data into the downloaded archive.
+- Signed sign-in: performs Apple's SAP handshake, which is required for `auth login` to work at all since August 2026.
 - Text or JSON output for scripts and automation.
 
 ## Installation
@@ -116,6 +117,12 @@ The UI is built with [ratatui](https://ratatui.rs/) and [crossterm](https://gith
 ### CLI
 
 Log in with your Apple ID. Two-factor authentication is supported.
+
+> **First sign-in downloads ~50 MB.** Apple requires sign-in requests to be
+> signed, and producing that signature means running Apple's own code (see
+> [How It Works](#how-it-works)). The pieces are fetched once, verified against
+> pinned SHA-256 digests, and cached under `~/.ipatool/cache/`; later sign-ins
+> reuse them. Delete that directory to force a re-download.
 
 ```bash
 # Interactive login (prompts for a 2FA code if Apple requires one)
@@ -241,7 +248,9 @@ ipatool-rs/
 
 ## How It Works
 
-1. **Auth** - Posts credentials to Apple's native auth endpoint using the legacy MZFinance protocol. Handles 2FA, redirects, retry logic, keychain storage, and cookies.
+1. **Auth** - Posts credentials to Apple's MZFinance endpoint, signed with an `X-Apple-ActionSignature`. Since August 2026 Apple rejects unsigned sign-in requests with an empty 403, so the signature is mandatory. Handles 2FA, pod redirects, retry logic, keychain storage, and cookies.
+
+   Producing the signature means running Apple's own signing code. On first use, ipatool-rs range-reads a public OS X 10.9 update package (~33 MB of 1.27 GB) to extract `CommerceKit`, `CommerceCore` and `CoreFP`, downloads a prebuilt [Unicorn](https://www.unicorn-engine.org/) emulator, and runs those x86-64 binaries in-process with their imports serviced from Rust. Everything is verified against pinned SHA-256 digests before it is executed and cached under `~/.ipatool/cache/`. No Apple code is redistributed with this tool.
 
 2. **Search/Lookup** - Queries the public iTunes Search API for app metadata and storefront-specific results.
 
@@ -274,6 +283,14 @@ The CLI commands are intentionally similar, but not identical. The main differen
 **I'm getting a 2FA prompt every time I run a command.**
 
 This usually means the stored token has expired and Apple is requiring a fresh login. Run `ipatool auth login` again. If you're running in a script, use `--non-interactive` and ensure your session is fresh before the run.
+
+**Why does the first login download tens of megabytes?**
+
+Apple now requires sign-in requests to carry a signature that only its own code can produce, so ipatool-rs fetches the Apple frameworks that produce it plus the emulator that runs them. Both are pinned by SHA-256 and cached under `~/.ipatool/cache/` (~50 MB), so this happens once. Nothing is downloaded for search, purchase or download once you are signed in.
+
+**Login fails with "failed to establish a SAP signing session".**
+
+The signing session could not be set up. Re-run with `--verbose` for the underlying cause. If it mentions integrity verification, delete `~/.ipatool/cache/` and try again — a truncated download is the usual reason. If it persists, please open an issue with the verbose output.
 
 **Which countries/storefronts are supported?**
 

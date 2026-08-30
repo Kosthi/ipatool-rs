@@ -26,13 +26,29 @@ pub async fn login(
         }
     };
 
-    let auth_url = api::bag::fetch_auth_endpoint(client)
+    let bag = api::bag::fetch_bag(client)
         .await
-        .context("failed to fetch auth endpoint")?;
+        .context("failed to fetch bag")?;
 
-    tracing::info!(url = %auth_url, "using auth endpoint");
+    tracing::info!(url = %bag.auth_endpoint, "using auth endpoint");
 
-    let mut account = match api::auth::login(client, email, &password, auth_code, &auth_url).await {
+    // Established once and reused: the handshake costs two round-trips to Apple
+    // and, on a cold cache, a download of the Apple frameworks and the emulator.
+    let signer = ipatool_core::sap::new_default_signer(client, &bag.sap, client.hardware_id())
+        .await
+        .context("failed to establish a SAP signing session")?;
+    let signer = Some(&signer as &dyn ipatool_core::sap::ActionSigner);
+
+    let mut account = match api::auth::login(
+        client,
+        email,
+        &password,
+        auth_code,
+        &bag.auth_endpoint,
+        signer,
+    )
+    .await
+    {
         Ok(account) => account,
         Err(ClientError::Store(StoreError::AuthCodeRequired))
             if auth_code.is_none() && !non_interactive =>
@@ -49,7 +65,16 @@ pub async fn login(
                 );
             }
 
-            match api::auth::login(client, email, &password, Some(auth_code), &auth_url).await {
+            match api::auth::login(
+                client,
+                email,
+                &password,
+                Some(auth_code),
+                &bag.auth_endpoint,
+                signer,
+            )
+            .await
+            {
                 Ok(account) => account,
                 Err(ClientError::Store(StoreError::AuthCodeRequired)) => {
                     bail!("login rejected; check your password and 2FA code")

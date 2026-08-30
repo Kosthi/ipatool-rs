@@ -26,8 +26,26 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "linux-
 cookie_store = "0.21"
 reqwest_cookie_store = "0.8"
 url = "2"
+base64 = "0.22"
 bytes = "1"
 futures-util = "0.3"
 phf = { version = "0.11", features = ["macros"] }
 mac_address = "1"
 indicatif = "0.17"
+sha2 = "0.10"
+quick-xml = "0.37"
+bzip2 = "0.6"
+libloading = "0.8"
+sevenz-rust2 = "0.22"
+ruzstd = "0.9"
+tar = "0.4"
+getrandom = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }

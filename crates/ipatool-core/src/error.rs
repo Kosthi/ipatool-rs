@@ -116,6 +116,15 @@ pub enum ClientError {
     MissingHeader(String),
     #[error("unexpected response: {0}")]
     UnexpectedResponse(String),
+    #[error("SAP: {0}")]
+    Sap(String),
+    #[error(
+        "Apple rejected the sign-in request because it carried no action signature (HTTP {status}). \
+         Since 2026-08 Apple's bag lists MZFinance/authenticate under sign-sap-request, so sign-in \
+         requires an X-Apple-ActionSignature header that this build cannot produce yet. \
+         See https://github.com/Kosthi/ipatool-rs/issues/15"
+    )]
+    SapSignatureRequired { status: u16 },
 }
 
 impl ClientError {

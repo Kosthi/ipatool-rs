@@ -26,3 +26,6 @@ target
 
 # Local release packaging output
 dist/
+
+# macOS
+.DS_Store

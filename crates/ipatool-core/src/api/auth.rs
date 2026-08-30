@@ -5,10 +5,14 @@ use url::Url;
 use crate::client::AppleClient;
 use crate::error::{ClientError, StoreError};
 use crate::model::Account;
+use crate::sap::ActionSigner;
 
 const MAX_ATTEMPTS: u32 = 4;
 const MAX_REDIRECTS: u32 = 5;
 const AUTH_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Header carrying the SAP signature over the request body.
+const ACTION_SIGNATURE_HEADER: &str = "X-Apple-ActionSignature";
 
 pub async fn login(
     client: &AppleClient,
@@ -16,7 +20,10 @@ pub async fn login(
     password: &str,
     auth_code: Option<&str>,
     auth_url: &Url,
+    signer: Option<&dyn ActionSigner>,
 ) -> Result<Account, ClientError> {
+    super::bag::validate_auth_endpoint(auth_url)?;
+
     let password_with_code = match auth_code {
         Some(code) => format!("{password}{code}"),
         None => password.to_string(),
@@ -32,16 +39,22 @@ pub async fn login(
         plist::to_writer_xml(&mut body_bytes, &body)
             .map_err(|e| ClientError::UnexpectedResponse(format!("plist serialize: {e}")))?;
 
-        tracing::debug!(attempt, url = %current_url, "sending auth request");
+        tracing::debug!(attempt, url = %current_url, signed = signer.is_some(), "sending auth request");
 
-        let resp = client
+        let mut request = client
             .http()
             .post(current_url.as_str())
             .header("Content-Type", "application/x-apple-plist")
-            .timeout(AUTH_REQUEST_TIMEOUT)
-            .body(body_bytes)
-            .send()
-            .await?;
+            .timeout(AUTH_REQUEST_TIMEOUT);
+
+        // Apple signs the exact bytes it receives, so this has to happen after
+        // the body is serialized and before it is sent.
+        if let Some(signer) = signer {
+            let signature = signer.sign(&body_bytes)?;
+            request = request.header(ACTION_SIGNATURE_HEADER, encode_base64(&signature));
+        }
+
+        let resp = request.body(body_bytes).send().await?;
 
         let status = resp.status();
         tracing::debug!(%status, "auth response status");
@@ -60,9 +73,14 @@ pub async fn login(
                 .to_str()
                 .map_err(|_| ClientError::MissingHeader("location (invalid)".into()))?;
             tracing::debug!(new_url, "following redirect");
-            current_url = current_url
+            let new_url = current_url
                 .join(new_url)
                 .map_err(|e| ClientError::UnexpectedResponse(format!("redirect URL: {e}")))?;
+
+            // The redirect target receives the credentials on the next pass, so
+            // it gets the same scrutiny as the endpoint from the bag.
+            super::bag::validate_auth_endpoint(&new_url)?;
+            current_url = new_url;
             continue;
         }
 
@@ -87,6 +105,14 @@ pub async fn login(
         );
 
         if resp_body.is_empty() {
+            // Apple's application tier drops unsigned sign-in requests with a
+            // zero-length 403. Saying so beats reporting an empty response.
+            if signer.is_none() && status == reqwest::StatusCode::FORBIDDEN {
+                return Err(ClientError::SapSignatureRequired {
+                    status: status.as_u16(),
+                });
+            }
+
             return Err(ClientError::UnexpectedResponse(format!(
                 "empty response (HTTP {status})"
             )));
@@ -146,6 +172,11 @@ pub async fn login(
             password: None,
         });
     }
+}
+
+fn encode_base64(data: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(data)
 }
 
 fn build_auth_plist(email: &str, password: &str, guid: &str, attempt: u32) -> plist::Dictionary {

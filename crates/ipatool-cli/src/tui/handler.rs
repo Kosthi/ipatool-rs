@@ -292,7 +292,15 @@ mod tests {
 
     fn test_app_with_rx() -> (App_, UnboundedReceiver<Action>) {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let client = AppleClient::new("test-guid".to_string(), None).unwrap();
+        let client = AppleClient::new(
+            ipatool_core::guid::MachineIdentity {
+                guid: "AABBCCDDEEFF".to_string(),
+                hardware_id: vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF],
+            },
+            None,
+            std::env::temp_dir().join("ipatool-rs-test-cache"),
+        )
+        .unwrap();
 
         let app = App_ {
             active_tab: ActiveTab::Search,

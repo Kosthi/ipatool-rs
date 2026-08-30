@@ -50,6 +50,7 @@
 - **会话自动恢复**：在购买和下载流程中，当已存储凭证可用时，自动刷新过期的 token。
 - **健壮的下载**：流式传输 IPA 文件并显示进度，CLI 模式支持 HTTP Range 断点续传。
 - **IPA 注入修补**：将购买元数据和 SINF 授权数据注入下载的压缩包中。
+- **签名登录**：完成 Apple 的 SAP 握手——自 2026 年 8 月起，没有它 `auth login` 根本无法工作。
 - **文本或 JSON 输出**：方便脚本和自动化使用。
 
 ## 安装
@@ -97,3 +98,21 @@ cargo build --release
 
 # 二进制文件位于 target/release/ipatool
 ```
+
+## 首次登录会下载约 50 MB
+
+Apple 要求登录请求携带签名，而生成该签名需要运行 Apple 自己的代码。首次
+`auth login` 时，ipatool-rs 会：
+
+- 对一个公开的 OS X 10.9 更新包发范围请求，只取其中约 33 MB（整包 1.27 GB），
+  从中提取 `CommerceKit`、`CommerceCore` 和 `CoreFP`；
+- 下载预编译的 [Unicorn](https://www.unicorn-engine.org/) 模拟器，在进程内运行
+  这些 x86-64 二进制，它们的外部调用由 Rust 接管。
+
+所有内容在执行前都会对照钉死的 SHA-256 校验，并缓存在 `~/.ipatool/cache/`，
+之后的登录直接复用。删除该目录会触发重新下载。本工具不分发任何 Apple 代码。
+
+若登录报 `failed to establish a SAP signing session`，加 `--verbose` 查看具体原因；
+如果提示校验失败，通常是下载不完整，删掉 `~/.ipatool/cache/` 重试即可。
+
+英文 README 中的 [How It Works](README.md#how-it-works) 有更详细的说明。
