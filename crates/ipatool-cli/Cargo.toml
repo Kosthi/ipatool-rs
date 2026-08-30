@@ -15,7 +15,7 @@ name = "ipatool"
 path = "src/main.rs"
 
 [dependencies]
-ipatool-core = { version = "0.1.5", path = "../ipatool-core" }
+ipatool-core = { version = "0.1.7", path = "../ipatool-core" }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -1,0 +1,65 @@
+name: Publish to crates.io
+
+# Invoked by the Release workflow as a dist custom publish job, so it only runs
+# once every platform build succeeded and the GitHub Release exists. See
+# `publish-jobs` in dist-workspace.toml.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish-crates:
+    runs-on: "ubuntu-22.04"
+    # Capped by the permissions the calling job in release.yml grants us; a
+    # reusable workflow can narrow them but never escalate.
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      PLAN: ${{ inputs.plan }}
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      # `cargo publish --workspace` needs 1.90 or newer.
+      - name: Install Rust
+        run: rustup update stable --no-self-update && rustup default stable
+
+      - name: Check whether this version is already published
+        id: check
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "ipatool-rs") | .version')"
+          status="$(curl -s -o /dev/null -w '%{http_code}' \
+            -H 'User-Agent: ipatool-rs release workflow' \
+            "https://crates.io/api/v1/crates/ipatool-rs/${version}")"
+          if [ "$status" = "200" ]; then
+            echo "ipatool-rs ${version} is already on crates.io, skipping."
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publishing ipatool-rs ${version}"
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Trades the GitHub OIDC JWT for a short-lived crates.io token, so no
+      # long-lived registry secret has to live in the repository. The action's
+      # post step revokes the token when the job ends.
+      - name: Authenticate with crates.io
+        id: auth
+        if: ${{ steps.check.outputs.already == 'false' }}
+        uses: rust-lang/crates-io-auth-action@v1
+
+      # --workspace publishes ipatool-core first and waits for it to land in the
+      # index before ipatool-rs. The CLI needs that ordering: publishing strips
+      # the `path` dependency, so it resolves ipatool-core from the registry.
+      - name: Publish
+        if: ${{ steps.check.outputs.already == 'false' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --workspace --locked

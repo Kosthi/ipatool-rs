@@ -11,8 +11,12 @@ ci = "github"
 installers = ["shell", "powershell", "homebrew"]
 # The Homebrew tap to publish formulae into
 tap = "Kosthi/homebrew-tap"
-# Publish Homebrew formulae after uploading GitHub Release artifacts
-publish-jobs = ["homebrew"]
+# Publish Homebrew formulae and crates.io packages after uploading GitHub Release artifacts
+publish-jobs = ["homebrew", "./publish-crates"]
+# Trusted publishing needs `id-token: write` to mint the OIDC JWT, and `contents: read`
+# so the job can still check itself out. Overriding drops dist's `packages: write` default,
+# which crates.io publishing does not need.
+github-custom-job-permissions = { "publish-crates" = { "id-token" = "write", "contents" = "read" } }
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
