@@ -125,6 +125,14 @@ pub enum ClientError {
          See https://github.com/Kosthi/ipatool-rs/issues/15"
     )]
     SapSignatureRequired { status: u16 },
+    #[error(
+        "Apple returned no sign-in response after {tries} tries (HTTP {statuses}). None of the \
+         replies carried a store response, so this is Apple's edge dropping the request rather \
+         than a verdict on the account — the same request commonly succeeds from a different \
+         host, or a few minutes later. \
+         See https://github.com/Kosthi/ipatool-rs/issues/17"
+    )]
+    AuthEndpointUnavailable { tries: u32, statuses: String },
 }
 
 impl ClientError {
