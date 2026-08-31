@@ -58,7 +58,7 @@
 ### Homebrew（macOS / Linux）
 
 ```bash
-brew install Kosthi/tap/ipatool
+brew install Kosthi/tap/ipatool-rs
 ```
 
 ### Cargo
@@ -73,19 +73,19 @@ cargo install ipatool-rs
 
 ```bash
 # macOS / Linux
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-rs-installer.sh | sh
 
 # Windows PowerShell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-rs-installer.ps1 | iex"
 ```
 
 | 平台 | 文件 | 安装方式 |
 |------|------|----------|
-| Windows x64 | `ipatool-x86_64-pc-windows-msvc.zip` | 解压后将 `ipatool.exe` 放入 PATH。 |
-| macOS Apple Silicon | `ipatool-aarch64-apple-darwin.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
-| macOS Intel | `ipatool-x86_64-apple-darwin.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
-| Linux x64 | `ipatool-x86_64-unknown-linux-gnu.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
-| Linux ARM64 | `ipatool-aarch64-unknown-linux-gnu.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
+| Windows x64 | `ipatool-rs-x86_64-pc-windows-msvc.zip` | 解压后将 `ipatool.exe` 放入 PATH。 |
+| macOS Apple Silicon | `ipatool-rs-aarch64-apple-darwin.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
+| macOS Intel | `ipatool-rs-x86_64-apple-darwin.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
+| Linux x64 | `ipatool-rs-x86_64-unknown-linux-gnu.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
+| Linux ARM64 | `ipatool-rs-aarch64-unknown-linux-gnu.tar.xz` | 解压后将 `ipatool` 放入 PATH。 |
 
 每个发布版本还包含各资产的 `.sha256` 校验文件和统一的 `sha256.sum`。
 
