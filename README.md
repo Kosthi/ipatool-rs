@@ -59,7 +59,7 @@ This rewrite adds a keyboard-driven terminal UI, structured Rust models, clearer
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew install Kosthi/tap/ipatool
+brew install Kosthi/tap/ipatool-rs
 ```
 
 ### Cargo
@@ -76,19 +76,19 @@ The release also includes `cargo-dist` installer scripts that install the `ipato
 
 ```bash
 # macOS / Linux
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-rs-installer.sh | sh
 
 # Windows PowerShell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/Kosthi/ipatool-rs/releases/latest/download/ipatool-rs-installer.ps1 | iex"
 ```
 
 | Platform | Asset | Install |
 |----------|-------|---------|
-| Windows x64 | `ipatool-x86_64-pc-windows-msvc.zip` | Extract and place `ipatool.exe` on your `PATH`. |
-| macOS Apple Silicon | `ipatool-aarch64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
-| macOS Intel | `ipatool-x86_64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
-| Linux x64 | `ipatool-x86_64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
-| Linux ARM64 | `ipatool-aarch64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| Windows x64 | `ipatool-rs-x86_64-pc-windows-msvc.zip` | Extract and place `ipatool.exe` on your `PATH`. |
+| macOS Apple Silicon | `ipatool-rs-aarch64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| macOS Intel | `ipatool-rs-x86_64-apple-darwin.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| Linux x64 | `ipatool-rs-x86_64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
+| Linux ARM64 | `ipatool-rs-aarch64-unknown-linux-gnu.tar.xz` | Extract and place `ipatool` on your `PATH`. |
 
 Each release also includes per-asset `.sha256` files and a unified `sha256.sum`.
 
