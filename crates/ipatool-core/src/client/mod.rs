@@ -10,6 +10,23 @@ use crate::error::ClientError;
 use crate::guid::MachineIdentity;
 use crate::model::Account;
 
+/// Identifies this client to Apple as Apple Configurator.
+///
+/// This is not cosmetic: `init.itunes.apple.com/bag.xml` hands out a different
+/// `authenticateAccount` depending on who is asking, and the whole sign-in path
+/// — the endpoint allowlist in [`crate::api::bag`] and the SAP handshake it
+/// configures — is built around what the Configurator UA gets back.
+///
+/// | User-Agent          | `authenticateAccount`                        | `sign-sap-setup`               |
+/// |---------------------|----------------------------------------------|--------------------------------|
+/// | `Configurator/2.17` | `buy.itunes.apple.com/…/wa/authenticate`     | `…/signSapSetup/legacy`        |
+/// | `iTunes/12.12`      | `auth.itunes.apple.com/auth/v1/native`       | `…/signSapSetup` (no `legacy`) |
+/// | none                | `auth.itunes.apple.com/auth/v1/native/fast`  | `…/signSapSetup/legacy`        |
+///
+/// So changing this changes which endpoint the bag routes to, and can change
+/// the SAP setup URL along with it — possibly a different handshake variant.
+/// See issue #17, where the endpoint that turned up in a bag dump was mistaken
+/// for a client-independent migration.
 const USER_AGENT: &str =
     "Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6";
 
