@@ -45,7 +45,33 @@ pub fn normalize_plist_xml(body: &[u8]) -> Vec<u8> {
     body.to_vec()
 }
 
+/// Detect an HTML document before normalization can extract a dict from it.
+pub(crate) fn is_html_response(body: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(body);
+    let mut text = text.trim_start_matches('\u{feff}').trim_start();
+    loop {
+        if text.starts_with("<?") {
+            let Some(end) = text.find("?>") else { break };
+            text = text[end + 2..].trim_start();
+        } else if text.starts_with("<!--") {
+            let Some(end) = text.find("-->") else { break };
+            text = text[end + 3..].trim_start();
+        } else {
+            break;
+        }
+    }
+    ["<html", "<!doctype html"].iter().any(|prefix| {
+        text.get(..prefix.len())
+            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+    })
+}
+
 pub fn parse_plist_response<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, ClientError> {
+    if is_html_response(body) {
+        return Err(ClientError::UnexpectedResponse(
+            "received HTML instead of a property list; Apple or a network intermediary returned an error page".into(),
+        ));
+    }
     let normalized = normalize_plist_xml(body);
     let cursor = std::io::Cursor::new(&normalized);
     plist::from_reader(cursor).map_err(ClientError::PlistDe)
@@ -55,6 +81,36 @@ pub fn parse_plist_response<T: serde::de::DeserializeOwned>(body: &[u8]) -> Resu
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn html_is_reported_without_a_serde_error_or_response_body() {
+        let body = b"<html>\n<head><title>Denied</title></head>\n<body>SECRET_TOKEN</body></html>";
+        let err = parse_plist_response::<HashMap<String, plist::Value>>(body).unwrap_err();
+        assert!(
+            matches!(err, ClientError::UnexpectedResponse(_)),
+            "expected an actionable HTML diagnostic, got {err}"
+        );
+        assert!(err.to_string().contains("HTML"));
+        assert!(!err.to_string().contains("SECRET_TOKEN"));
+    }
+
+    #[test]
+    fn detects_html_with_preamble_before_extracting_embedded_plist() {
+        for prefix in [
+            "",
+            "\u{feff} \n",
+            "<?xml version=\"1.0\"?>\n<!-- error -->\n",
+        ] {
+            for document in ["<HTML>", "<!DOCTYPE HTML>"] {
+                let body = format!("{prefix}{document}<plist><dict/></plist></html>");
+                assert!(is_html_response(body.as_bytes()));
+                assert!(matches!(
+                    parse_plist_response::<HashMap<String, plist::Value>>(body.as_bytes()),
+                    Err(ClientError::UnexpectedResponse(_))
+                ));
+            }
+        }
+    }
 
     #[test]
     fn test_normalize_standard_plist() {

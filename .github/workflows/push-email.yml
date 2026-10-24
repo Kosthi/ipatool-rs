@@ -1,0 +1,133 @@
+name: Repository push email
+
+"on":
+  push:
+  workflow_dispatch:
+    inputs:
+      send_email:
+        description: Send a labelled test email instead of validating configuration only
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send push summary to both recipients
+        env:
+          SMTP_HOST: smtp.yandex.ru
+          SMTP_PORT: '587'
+          SMTP_USER: ${{ secrets.PUSH_MAIL_SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.PUSH_MAIL_SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.PUSH_MAIL_FROM }}
+          MAIL_FROM_NAME: Pooltronic
+          MAIL_TO: ${{ secrets.PUSH_MAIL_OWNER_TO }}
+          MAIL_EXTRA_TO: ${{ secrets.PUSH_MAIL_EXTRA_TO }}
+          SEND_EMAIL: ${{ github.event_name != 'workflow_dispatch' || inputs.send_email }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import smtplib
+          import ssl
+          from datetime import datetime, timezone
+          from email.headerregistry import Address
+          from email.message import EmailMessage
+          from email.utils import format_datetime, make_msgid
+
+          def address(value):
+              if any(c in value for c in ("\r", "\n")):
+                  raise ValueError("Invalid email address")
+              parsed = Address(addr_spec=value.strip())
+              if not parsed.username or not parsed.domain:
+                  raise ValueError("Invalid email address")
+              return str(parsed)
+
+          required = ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_TO")
+          missing = [key for key in required if not os.environ.get(key, "").strip()]
+          if missing:
+              raise SystemExit("Missing configuration: " + ", ".join(missing))
+
+          port = int(os.environ.get("SMTP_PORT") or "587")
+          if port not in (465, 587):
+              raise SystemExit("Use port 465 for TLS or port 587 for STARTTLS")
+          sender = address(os.environ.get("MAIL_FROM") or os.environ["SMTP_USER"])
+          recipients = list(dict.fromkeys(
+              address(item) for item in os.environ["MAIL_TO"].split(",") if item.strip()
+          ))
+          if len(recipients) != 1:
+              raise SystemExit("Configure exactly one owner recipient address")
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
+              event = json.load(file)
+          repository = os.environ["GITHUB_REPOSITORY"]
+          actor = os.environ["GITHUB_ACTOR"]
+          ref = event.get("ref") or os.environ.get("GITHUB_REF", "")
+          display_ref = ref.removeprefix("refs/heads/").removeprefix("refs/tags/")
+          display_ref = " ".join(display_ref.split())
+          manual = os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
+          if repository == "gbgb66/TelePool" and actor == "fox15155" and not manual:
+              extra = os.environ.get("MAIL_EXTRA_TO", "").strip()
+              if not extra:
+                  raise SystemExit("Missing TelePool collaborator recipient")
+              recipients = list(dict.fromkeys(recipients + [address(extra)]))
+          subject = "Тест уведомлений" if manual else f"Push от {actor} — {display_ref}"
+          lines = [
+              "Тест рассылки о push" if manual else "Новые изменения в репозитории GitHub",
+              f"Репозиторий: {repository}",
+              f"Отправил push: {actor}" if not manual else f"Тест запустил: {actor}",
+              f"Ветка или тег: {display_ref}",
+          ]
+          commits = event.get("commits") or []
+          if commits:
+              lines.extend(["", "Коммиты из события GitHub:"])
+              for commit in commits[:20]:
+                  title = " ".join(str(commit.get("message", "")).splitlines())[:300]
+                  lines.append(f"- {str(commit.get('id', ''))[:7]} {title}")
+              if len(commits) > 20:
+                  lines.append("Остальные коммиты — по ссылке сравнения ниже")
+          if event.get("compare"):
+              lines.extend(["", "Сравнение изменений: " + event["compare"]])
+          run_url = (
+              f"{os.environ['GITHUB_SERVER_URL']}/{repository}/actions/runs/"
+              f"{os.environ['GITHUB_RUN_ID']}"
+          )
+          lines.extend(["", "Запуск уведомления: " + run_url])
+
+          message = EmailMessage()
+          message["From"] = str(Address(
+              display_name=os.environ.get("MAIL_FROM_NAME", ""), addr_spec=sender
+          ))
+          message["To"] = ", ".join(recipients)
+          message["Subject"] = f"[{repository}] " + subject
+          message["Date"] = format_datetime(datetime.now(timezone.utc))
+          message["Message-ID"] = make_msgid(domain=sender.rsplit("@", 1)[1])
+          message.set_content("\n".join(lines))
+
+          if os.environ.get("SEND_EMAIL", "false").lower() != "true":
+              print("Configuration validated; email not sent")
+              raise SystemExit(0)
+
+          context = ssl.create_default_context()
+          try:
+              if port == 465:
+                  smtp = smtplib.SMTP_SSL(os.environ["SMTP_HOST"], port,
+                                          context=context, timeout=30)
+              else:
+                  smtp = smtplib.SMTP(os.environ["SMTP_HOST"], port, timeout=30)
+              with smtp:
+                  if port == 587:
+                      smtp.ehlo()
+                      smtp.starttls(context=context)
+                      smtp.ehlo()
+                  smtp.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
+                  refused = smtp.send_message(message, from_addr=sender, to_addrs=recipients)
+                  if refused:
+                      raise SystemExit("SMTP did not accept all recipients; check provider delivery")
+          except (OSError, smtplib.SMTPException) as error:
+              raise SystemExit("Mail submission failed: " + type(error).__name__) from None
+          print(f"SMTP accepted the notification for {len(recipients)} recipient(s)")
+          PY

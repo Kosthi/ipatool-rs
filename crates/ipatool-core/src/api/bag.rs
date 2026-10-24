@@ -47,8 +47,11 @@ pub async fn fetch_bag(client: &AppleClient) -> Result<BagConfig, ClientError> {
 }
 
 fn parse_bag(inner: &HashMap<String, plist::Value>) -> Result<BagConfig, ClientError> {
-    let auth_endpoint = bag_url(inner, "authenticateAccount")?;
+    let mut auth_endpoint = bag_url(inner, "authenticateAccount")?;
     validate_auth_endpoint(&auth_endpoint)?;
+    // The bare action path can produce empty 204 or HTML without reaching
+    // Store. Canonicalize only after validation, preserving host and routing.
+    auth_endpoint.set_path(&format!("{AUTH_PATH}/"));
 
     // Apple publishes the version as a string.
     let version_str = inner
@@ -148,13 +151,34 @@ mod tests {
 
         assert_eq!(
             config.auth_endpoint.as_str(),
-            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate/"
         );
         assert_eq!(
             config.sap.setup_url.as_str(),
             "https://fpinit.itunes.apple.com/v1/signSapSetup/legacy"
         );
         assert_eq!(config.sap.version, 200);
+    }
+
+    #[test]
+    fn initial_auth_url_has_a_trailing_slash_and_preserves_pod_and_query() {
+        for endpoint in [
+            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate",
+            "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate/",
+            "https://p17-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate?Pod=17&PRH=17",
+        ] {
+            let mut bag = current_bag();
+            bag.insert(
+                "authenticateAccount".into(),
+                plist::Value::String(endpoint.into()),
+            );
+            let original = url(endpoint);
+            let parsed = parse_bag(&bag).unwrap().auth_endpoint;
+            assert_eq!(parsed.path(), format!("{AUTH_PATH}/"));
+            assert_eq!(parsed.scheme(), original.scheme());
+            assert_eq!(parsed.host_str(), original.host_str());
+            assert_eq!(parsed.query(), original.query());
+        }
     }
 
     #[test]
